@@ -1,121 +1,173 @@
-import Link from "next/link";
+// components/Nav.tsx
 import { useState, useEffect } from "react";
-import { useRouter } from "next/router";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
 
+  // Close drawer on route changes / Esc
   useEffect(() => {
-    const close = () => setOpen(false);
-    router.events.on("routeChangeStart", close);
-    return () => router.events.off("routeChangeStart", close);
-  }, [router.events]);
-
-  const linkBase: React.CSSProperties = {
-    color: "#e5e7eb",
-    textDecoration: "none",
-    fontWeight: 700,
-    padding: "10px 12px",
-    borderRadius: 8,
-    display: "inline-flex",
-    alignItems: "center",
-    lineHeight: 1,
-  };
-
-  const linkActive: React.CSSProperties = { color: "#93c5fd" };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
-    <header className="nav-root">
-      <div className="nav-wrap">
-        {/* Brand */}
-        <Link href="/" className="brand" aria-label="Home">
-          <img src="/logo.png" alt="" className="logo" />
-          <span className="brand-text">JLA Trailer Rentals</span>
+    <header className="nav">
+      <div className="inner">
+        {/* Left: Logo + Brand (perfectly centered vertically) */}
+        <Link href="/" className="brand">
+          <span className="logoWrap">
+            <Image
+              src="/logo.png"
+              alt="JLA Trailer Rentals"
+              width={36}
+              height={36}
+              className="logo"
+              priority
+            />
+          </span>
+          <span className="brandText">JLA Trailer Rentals</span>
         </Link>
 
-        {/* Desktop links */}
+        {/* Desktop menu */}
         <nav className="links">
-          <Link href="/fleet" style={{ ...linkBase, ...(router.pathname === "/fleet" ? linkActive : {}) }}>
-            Our Fleet
-          </Link>
-          <Link href="/book" style={{ ...linkBase, ...(router.pathname.startsWith("/book") ? linkActive : {}) }}>
-            Book
-          </Link>
-          <Link href="/find" style={{ ...linkBase, ...(router.pathname === "/find" ? linkActive : {}) }}>
-            Find My Rental
-          </Link>
+          <Link href="/fleet" className="link">Our Fleet</Link>
+          <Link href="/book" className="link">Book</Link>
+          <Link href="/find" className="link">Find My Rental</Link>
         </nav>
 
-        {/* Hamburger */}
-        <button className="hamburger" aria-label="Menu" onClick={() => setOpen(v => !v)}>
-          <span /><span /><span />
+        {/* Mobile hamburger */}
+        <button
+          className="burger"
+          aria-label="Open menu"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="bar" />
+          <span className="bar" />
+          <span className="bar" />
         </button>
       </div>
 
       {/* Mobile drawer */}
-      {open && (
-        <div className="mobile-menu">
-          <Link href="/fleet" className="m-link">Our Fleet</Link>
-          <Link href="/book" className="m-link">Book</Link>
-          <Link href="/find" className="m-link">Find My Rental</Link>
-        </div>
-      )}
+      <div className={`drawer ${open ? "open" : ""}`}>
+        <Link href="/fleet" className="drawerLink" onClick={() => setOpen(false)}>
+          Our Fleet
+        </Link>
+        <Link href="/book" className="drawerLink" onClick={() => setOpen(false)}>
+          Book
+        </Link>
+        <Link href="/find" className="drawerLink" onClick={() => setOpen(false)}>
+          Find My Rental
+        </Link>
+      </div>
 
       <style jsx>{`
-        .nav-root {
-          position: sticky; top: 0; z-index: 50;
-          background: rgba(2,6,23,0.9);
-          backdrop-filter: saturate(160%) blur(6px);
-          border-bottom: 1px solid #0f172a;
+        .nav {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: #0a0f1a; /* same dark as site */
+          border-bottom: 1px solid rgba(255,255,255,0.06);
         }
-        .nav-wrap {
-          max-width: 1100px; margin: 0 auto; padding: 10px 16px;
-          display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        .inner {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 10px 16px;            /* a bit taller */
+          display: flex;
+          align-items: center;           /* centers brand with logo vertically */
+          justify-content: space-between;
+          gap: 12px;
         }
+
         .brand {
-          display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
+          display: inline-flex;
+          align-items: center;           /* <- perfect vertical center with logo */
+          gap: 10px;
+          text-decoration: none;
+        }
+        .logoWrap {
+          width: 36px;
+          height: 36px;
+          display: grid;
+          place-items: center;
+          border-radius: 999px;
+          background: #0f172a;
+          outline: 1px solid rgba(255,255,255,0.15);
         }
         .logo {
-          width: 36px; height: 36px; border-radius: 9999px;
-          background: #0b1220; border: 1px solid #1f2937; object-fit: cover;
+          object-fit: cover;
+          border-radius: 999px;
         }
-        .brand-text {
-          color: #ffffff; font-weight: 800; font-size: 18px; letter-spacing: .1px;
-          line-height: 1; transform: translateY(1px); /* optical alignment with circle */
-          white-space: nowrap;
+        .brandText {
+          color: #ffffff;
+          font-weight: 800;
+          letter-spacing: 0.2px;
+          line-height: 1;                /* keeps it centered relative to logo */
+          font-size: 18px;
         }
 
-        .links { display: none; align-items: center; gap: 6px; }
-        .links :global(a:hover) { color: #93c5fd !important; }
+        .links {
+          display: none;
+          gap: 22px;
+          align-items: center;
+        }
+        .link {
+          color: #ffffff;                 /* ALWAYS white */
+          text-decoration: none;
+          font-weight: 600;
+          padding: 6px 10px;
+          border-radius: 6px;
+          transition: color .15s ease, background .15s ease;
+        }
+        .link:hover {
+          background: rgba(255,255,255,0.08);
+        }
 
-        .hamburger {
-          display: inline-flex; flex-direction: column; gap: 4px;
-          width: 40px; height: 40px; border-radius: 8px;
-          border: 1px solid #1f2937; background: #0b1220; cursor: pointer;
-          align-items: center; justify-content: center;
+        .burger {
+          display: inline-grid;
+          gap: 4px;
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.14);
+          place-items: center;
         }
-        .hamburger span { width: 18px; height: 2px; background: #e5e7eb; border-radius: 2px; }
+        .burger .bar {
+          width: 18px;
+          height: 2px;
+          background: #ffffff;
+          border-radius: 2px;
+        }
 
-        .mobile-menu {
-          display: grid; gap: 4px; padding: 10px 16px 14px;
-          border-top: 1px solid #0f172a; background: rgba(2,6,23,0.95);
+        .drawer {
+          display: none;
         }
-        .m-link {
-          display: block; text-decoration: none !important;
-          color: #e5e7eb !important; /* ← force white */
-          font-weight: 700; padding: 12px 6px;
+        .drawer.open {
+          display: block;
+          background: #0a0f1a;
+          border-top: 1px solid rgba(255,255,255,0.06);
         }
-        .m-link:hover { color: #93c5fd !important; }
+        .drawerLink {
+          display: block;
+          color: #ffffff;                /* WHITE, not blue */
+          text-decoration: none;
+          font-weight: 600;
+          padding: 14px 20px;
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .drawerLink:hover {
+          background: rgba(255,255,255,0.06);
+        }
 
-        @media (min-width: 820px) {
-          .links { display: inline-flex; }
-          .hamburger, .mobile-menu { display: none; }
-        }
-        @media (max-height: 420px) and (orientation: landscape) {
-          .brand-text { font-size: 16px; }
-          .logo { width: 32px; height: 32px; }
-          .nav-wrap { padding-top: 6px; padding-bottom: 6px; }
+        /* Desktop breakpoint */
+        @media (min-width: 900px) {
+          .brandText { font-size: 19px; }
+          .links { display: flex; }
+          .burger { display: none; }
+          .drawer { display: none !important; }
         }
       `}</style>
     </header>
