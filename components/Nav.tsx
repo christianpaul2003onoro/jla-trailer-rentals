@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 export default function Nav() {
   const [open, setOpen] = useState(false);
 
-  // Close drawer on route change or resize/orientation change
   useEffect(() => {
     const close = () => setOpen(false);
     window.addEventListener("resize", close);
@@ -20,9 +19,9 @@ export default function Nav() {
   return (
     <>
       <header className="nav">
-        {/* Left: Logo */}
-        <Link href="/" className="brandLeft" aria-label="Go to Home">
-          <span className="logoWrap" aria-hidden>
+        {/* Left logo */}
+        <Link href="/" className="brandLeft" aria-label="Home">
+          <span className="logoWrap">
             <Image
               src="/logo.png"
               alt="JLA logo"
@@ -33,25 +32,24 @@ export default function Nav() {
           </span>
         </Link>
 
-        {/* Center: Brand text (always centered) */}
+        {/* Center title */}
         <Link href="/" className="brandCenter">
           JLA Trailer Rentals
         </Link>
 
-        {/* Right: inline links (desktop & mobile landscape) */}
-        <nav className="links" aria-label="Primary">
+        {/* Right links (desktop + landscape) */}
+        <nav className="links">
           <Link href="/fleet">Our Fleet</Link>
           <Link href="/book">Book</Link>
           <Link href="/find">Find My Rental</Link>
         </nav>
 
-        {/* Right: hamburger (only mobile portrait) */}
+        {/* Hamburger (only mobile portrait) */}
         <button
           className="hamburger"
           onClick={() => setOpen((v) => !v)}
           aria-label="Open menu"
           aria-expanded={open ? "true" : "false"}
-          aria-controls="mobile-drawer"
         >
           <span className="bar" />
           <span className="bar" />
@@ -59,9 +57,9 @@ export default function Nav() {
         </button>
       </header>
 
-      {/* Drawer (mobile portrait only) */}
+      {/* Drawer menu */}
       {open && (
-        <div id="mobile-drawer" className="drawer" role="dialog" aria-modal="true">
+        <div className="drawer">
           <Link href="/fleet" className="drawerLink" onClick={() => setOpen(false)}>
             Our Fleet
           </Link>
@@ -75,13 +73,12 @@ export default function Nav() {
       )}
 
       <style jsx>{`
-        /* Bar container */
         .nav {
           position: sticky;
           top: 0;
           z-index: 50;
           display: grid;
-          grid-template-columns: 48px 1fr auto; /* logo | center brand | right area */
+          grid-template-columns: 48px 1fr auto;
           align-items: center;
           gap: 12px;
           height: 64px;
@@ -98,36 +95,27 @@ export default function Nav() {
           display: grid;
           place-items: center;
           background: #0b1220;
-          border: 2px solid rgba(255, 255, 255, 0.12);
-          border-radius: 999px; /* circle */
-          overflow: hidden; /* keep the logo inside circle */
-        }
-        .brandLeft {
-          display: grid;
-          place-items: center;
-          height: 100%;
+          border-radius: 999px;
+          overflow: hidden;
         }
 
         /* Center title */
         .brandCenter {
-          justify-self: center;   /* real center in the grid */
-          color: #eaf2ff;
+          justify-self: center;
+          color: #ffffff; /* WHITE text */
           font-weight: 800;
-          letter-spacing: 0.2px;
-          text-decoration: none;
           font-size: 18px;
-          line-height: 1;
-          white-space: nowrap;
+          text-decoration: none;
         }
 
-        /* Right links (inline) */
+        /* Desktop/landscape links */
         .links {
           display: flex;
           align-items: center;
           gap: 18px;
         }
         .links :global(a) {
-          color: #e5e7eb;
+          color: #ffffff; /* WHITE text */
           text-decoration: none;
           font-weight: 600;
         }
@@ -135,43 +123,36 @@ export default function Nav() {
           color: #93c5fd;
         }
 
-        /* Hamburger button — hidden by default (shows only on mobile portrait) */
+        /* Hamburger */
         .hamburger {
           display: none;
+          flex-direction: column;
+          justify-content: space-around;
+          align-items: center;
           width: 44px;
           height: 44px;
-          align-items: center;
-          justify-content: center;
+          border: 1px solid rgba(255, 255, 255, 0.15);
           border-radius: 10px;
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          background: rgba(15, 18, 26, 0.6);
+          background: transparent;
         }
         .bar {
           width: 20px;
           height: 2px;
-          background: #ffffff; /* white bars */
-          display: block;
-          margin: 2px 0;
+          background: #ffffff; /* White bars */
           border-radius: 2px;
         }
 
-        /* Drawer (opens below bar) */
+        /* Drawer */
         .drawer {
-          display: none; /* enabled in mobile portrait rules */
+          display: none;
         }
 
-        /* -------------------------------
-           Mobile portrait rules
-           - hide inline links
-           - show hamburger
-           - enable white drawer text
-        --------------------------------*/
         @media (max-width: 768px) and (orientation: portrait) {
           .links {
             display: none;
           }
           .hamburger {
-            display: inline-flex;
+            display: flex;
           }
 
           .drawer {
@@ -180,35 +161,15 @@ export default function Nav() {
             padding: 16px;
             background: rgba(7, 12, 24, 0.98);
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            animation: slideDown 180ms ease-out;
           }
           .drawerLink {
-            color: #ffffff !important; /* force white */
+            color: #ffffff !important; /* White */
             font-weight: 700;
             font-size: 17px;
             text-decoration: none;
           }
           .drawerLink:hover {
-            color: #93c5fd;
-          }
-
-          /* slightly larger center brand on phones */
-          .brandCenter {
-            font-size: 17px;
-          }
-        }
-
-        /* Mobile landscape & desktop:
-           - show links, hide hamburger (default already does it) */
-
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+            color: #3b82f6;
           }
         }
       `}</style>
