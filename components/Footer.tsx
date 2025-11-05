@@ -1,46 +1,85 @@
 // components/Footer.tsx
 export default function Footer() {
+  const year = new Date().getFullYear();
+
   return (
-    <>
-      <footer className="foot">
-        <div className="row">
-          <span>11500 SW 47th St, Miami, FL 33165</span>
-        </div>
-        <div className="row">
-          <a href="tel:+17867606175">(786) 760-6175</a>
-          <span className="sep">•</span>
-          <a href="mailto:JLAtrailerrental@gmail.com">JLAtrailerrental@gmail.com</a>
-          <span className="sep">•</span>
-          <a href="https://instagram.com/jlatrailerrentals" target="_blank" rel="noreferrer">
-            @jlatrailerrentals
+    <footer style={{ borderTop: "1px solid #1f2937", marginTop: 48 }}>
+      <div
+        style={{
+          maxWidth: 1100,
+          margin: "0 auto",
+          padding: "20px 16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          textAlign: "center",
+          color: "#cbd5e1",
+        }}
+      >
+        {/* Address */}
+        <div>11500 SW 47th St, Miami, FL 33165</div>
+
+        {/* Contact row */}
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <a href="tel:+17867606175" style={{ color: "#93c5fd" }}>
+            (786) 760-6175
+          </a>
+
+          <a
+            href="mailto:JLAtrailerrental@gmail.com"
+            style={{ color: "#93c5fd" }}
+          >
+            JLAtrailerrental@gmail.com
+          </a>
+
+          {/* IG: icon + handle are both clickable */}
+          <a
+            href="https://instagram.com/jlatrailerrentals"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram @jlatrailerrentals"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              color: "#93c5fd",
+              textDecoration: "none",
+            }}
+          >
+            {/* Minimal Instagram glyph (uses currentColor) */}
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}
+            >
+              <rect x="3" y="3" width="18" height="18" rx="5" />
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+            </svg>
+            <span>@jlatrailerrentals</span>
           </a>
         </div>
-        <div className="row dim">© 2025 JLA Trailer Rentals</div>
-      </footer>
 
-      <style jsx>{`
-        .foot {
-          position: fixed;           /* always visible, no scrolling needed */
-          left: 0; right: 0; bottom: 0;
-          z-index: 40;
-          background: rgba(2, 6, 23, 0.60);   /* glassy */
-          backdrop-filter: blur(6px);
-          border-top: 1px solid rgba(255, 255, 255, 0.08);
-          padding: 14px 16px;
-          display: grid;
-          gap: 6px;
-          text-align: center;
-        }
-        .row { color: #cbd5e1; font-size: 14px; }
-        .row.dim { color: #94a3b8; font-size: 12px; }
-        a { color: #93c5fd; text-decoration: none; }
-        a:hover { color: #bfdbfe; }
-        .sep { margin: 0 8px; color: #94a3b8; }
-        @media (max-width: 420px) {
-          .row { font-size: 13px; }
-          .row.dim { font-size: 11px; }
-        }
-      `}</style>
-    </>
+        {/* Copyright */}
+        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+          © {year} JLA Trailer Rentals
+        </div>
+      </div>
+    </footer>
   );
 }
