@@ -26,7 +26,7 @@ export default function HomePage() {
               Reliable trailers. Simple bookings. Local pickup in Miami.
             </p>
 
-            {/* Keep only the two buttons in the middle */}
+            {/* Only these two buttons in the middle */}
             <div className="cta">
               <Link href="/book" className="btn primary">
                 Book a Trailer Rental
@@ -47,7 +47,6 @@ export default function HomePage() {
           min-height: 76vh;
           display: grid;
           place-items: center;
-          /* Your wallpaper lives in /public — this path is correct */
           background-image: url("/home_page_background_wallpaper.png");
           background-size: cover;
           background-position: center;
@@ -56,16 +55,12 @@ export default function HomePage() {
         .overlay {
           position: absolute;
           inset: 0;
+          /* LIGHTER gradient than before (less shade) */
           background: linear-gradient(
-              to bottom,
-              rgba(2, 6, 23, 0.55),
-              rgba(2, 6, 23, 0.85)
-            ),
-            radial-gradient(
-              circle at 50% 40%,
-              rgba(2, 6, 23, 0.3),
-              rgba(2, 6, 23, 0.9) 70%
-            );
+            to bottom,
+            rgba(2, 6, 23, 0.28),   /* top */
+            rgba(2, 6, 23, 0.55)    /* bottom */
+          );
         }
         .center {
           position: relative;
@@ -81,7 +76,7 @@ export default function HomePage() {
           line-height: 1.1;
           font-weight: 900;
           color: #ffffff;
-          text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
+          text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
         }
         .sub {
           color: #cbd5e1;
@@ -102,8 +97,7 @@ export default function HomePage() {
           font-weight: 700;
           border: 1px solid #334155;
           color: #e5e7eb;
-          transition: transform 0.05s ease, background 0.2s ease,
-            border-color 0.2s ease;
+          transition: transform 0.05s ease, background 0.2s ease, border-color 0.2s ease;
         }
         .btn:active {
           transform: translateY(1px);
@@ -118,10 +112,10 @@ export default function HomePage() {
           border-color: #1e3a8a;
         }
         .ghost {
-          background: rgba(2, 6, 23, 0.5);
+          background: rgba(2, 6, 23, 0.35); /* lighter ghost so bg shows */
         }
         .ghost:hover {
-          background: rgba(2, 6, 23, 0.7);
+          background: rgba(2, 6, 23, 0.5);
         }
 
         @media (max-width: 640px) {
