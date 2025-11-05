@@ -1,138 +1,78 @@
 // pages/api/find.ts
-// Look up a booking by Rental ID + Access Key (hashed), return joined client/trailer data.
-
 import type { NextApiRequest, NextApiResponse } from "next";
-import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import crypto from "crypto";
+import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
-// explain: small helper to hash the 6-digit key the same way we stored it.
-function hash(key: string) {
-  const pepper = process.env.ACCESS_PEPPER || "";
-  return crypto.createHash("sha256").update((key || "") + pepper).digest("hex");
-}
-
-type Ok = {
-  ok: true;
-  data: {
-    rentalId: string;
-    startDate: string;
-    endDate: string;
-    pickupTime: string | null;
-    returnTime: string | null;
-    status: string;
-    deliveryRequested: boolean;
-    client: {
-      firstName: string | null;
-      lastName: string | null;
-      email: string | null;
-      phone: string | null;
-      towingVehicle: string | null;
-    };
-    trailer: {
-      id: string | null;
-      name: string | null;
-      ratePerDay: number | null;
-    };
-  };
-};
-
-type Err = { ok: false; error: string };
-
-function hashAccessKey(key: string) {
-  const pepper = process.env.ACCESS_PEPPER || "";
-  return crypto.createHash("sha256").update((key || "") + pepper).digest("hex");
-}
+type Out =
+  | {
+      ok: true;
+      booking: {
+        rental_id: string;
+        status: string;
+        start_date: string;
+        end_date: string;
+        pickup_time: string | null;
+        return_time: string | null;
+        delivery_requested: boolean;
+        trailer: { name: string; rate_per_day: number };
+      };
+    }
+  | { ok: false; error: string };
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<Ok | Err>
+  res: NextApiResponse<Out>
 ) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
-    return res.status(405).json({ ok: false, error: "Method not allowed." });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  const { rentalId, accessKey } = req.body || {};
-  if (!rentalId || !accessKey) {
-    return res
-      .status(400)
-      .json({ ok: false, error: "Missing rentalId or accessKey." });
-  }
+  const { rental, key } = (req.body ?? {}) as { rental?: string; key?: string };
+  if (!rental?.trim()) return res.status(400).json({ ok: false, error: "Rental ID required." });
+  if (!key?.trim())    return res.status(400).json({ ok: false, error: "Access Key required." });
 
-  // Fetch booking + joined client & trailer
+  // Hash the key the same way we did when creating the booking
+  const pepper = process.env.ACCESS_PEPPER || "";
+  const access_key_hash = crypto.createHash("sha256").update(String(key) + pepper).digest("hex");
+
+  // Find the booking using rental_id + access_key_hash
   const { data, error } = await supabaseAdmin
     .from("bookings")
     .select(
       `
       rental_id,
+      status,
       start_date,
       end_date,
       pickup_time,
       return_time,
-      status,
       delivery_requested,
-      access_key_hash,
-      clients (
-        first_name,
-        last_name,
-        email,
-        phone,
-        towing_vehicle
-      ),
-      trailers (
-        id,
-        name,
-        rate_per_day
-      )
+      trailers!bookings_trailer_id_fkey ( name, rate_per_day )
     `
     )
-    .eq("rental_id", rentalId)
+    .eq("rental_id", rental.trim())
+    .eq("access_key_hash", access_key_hash)
+    .limit(1)
     .maybeSingle();
 
-  if (error) {
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-  if (!data) {
-    return res.status(404).json({ ok: false, error: "Booking not found." });
-  }
+  if (error) return res.status(500).json({ ok: false, error: "Lookup failed." });
+  if (!data)  return res.status(404).json({ ok: false, error: "Not found. Check your Rental ID and Key." });
 
-  // Verify access key (hash must match)
-  const providedHash = hashAccessKey(String(accessKey));
-  const storedHash = String((data as any).access_key_hash || "");
-  if (!storedHash || storedHash !== providedHash) {
-    return res.status(401).json({ ok: false, error: "Invalid access key." });
-  }
-
-  // Safely unwrap possible array/object/null returns from Supabase
-  const c: any = (data as any).clients;
-  const tRaw: any = (data as any).trailers;
-  const t: any =
-    tRaw && Array.isArray(tRaw) ? (tRaw[0] ?? null) : tRaw ?? null;
-
-  const out: Ok["data"] = {
-    rentalId: String((data as any).rental_id),
-    startDate: String((data as any).start_date),
-    endDate: String((data as any).end_date),
-    pickupTime:
-      (data as any).pickup_time != null ? String((data as any).pickup_time) : null,
-    returnTime:
-      (data as any).return_time != null ? String((data as any).return_time) : null,
-    status: String((data as any).status),
-    deliveryRequested: !!(data as any).delivery_requested,
-    client: {
-      firstName: c?.first_name ?? null,
-      lastName: c?.last_name ?? null,
-      email: c?.email ?? null,
-      phone: c?.phone ?? null,
-      towingVehicle: c?.towing_vehicle ?? null,
+  return res.status(200).json({
+    ok: true,
+    booking: {
+      rental_id: data.rental_id,
+      status: data.status,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      pickup_time: data.pickup_time,
+      return_time: data.return_time,
+      delivery_requested: !!data.delivery_requested,
+      trailer: {
+        name: data.trailers?.name ?? "Trailer",
+        rate_per_day: Number(data.trailers?.rate_per_day ?? 0),
+      },
     },
-    trailer: {
-      id: t?.id != null ? String(t.id) : null,
-      name: t?.name != null ? String(t.name) : null,
-      ratePerDay:
-        t?.rate_per_day != null ? Number(t.rate_per_day) : null,
-    },
-  };
-
-  return res.status(200).json({ ok: true, data: out });
+  });
 }
