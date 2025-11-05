@@ -35,7 +35,7 @@ export default async function handler(
   const bad = (field: string, msg: string, status = 400) =>
     res.status(status).json({ ok: false, error: msg, field });
 
-  // Basic validation
+  // ------- Basic validation -------
   if (!trailer_id)         return bad("trailer_id", "Trailer is required.");
   if (!start_date)         return bad("start_date", "Start date required.");
   if (!end_date)           return bad("end_date", "End date required.");
@@ -49,7 +49,9 @@ export default async function handler(
   const normLast  = String(last_name).trim();
   const normPhone = String(phone).trim();
 
-  // --- GET or CREATE client (service role bypasses RLS) ---
+  // ------- Find or create client (admin client bypasses RLS) -------
+  let clientId: string | undefined;
+
   const { data: found, error: selErr } = await supabaseAdmin
     .from("clients")
     .select("id")
@@ -61,9 +63,20 @@ export default async function handler(
     return res.status(500).json({ ok: false, error: "Client lookup failed." });
   }
 
-  let clientId = found?.[0]?.id as string | undefined;
-
-  if (!clientId) {
+  if (found?.length) {
+    clientId = found[0].id;
+    // (Optional) keep details fresh
+    await supabaseAdmin
+      .from("clients")
+      .update({
+        first_name: normFirst,
+        last_name: normLast,
+        phone: normPhone,
+        towing_vehicle: towing_vehicle ?? null,
+        comments: comments ?? null,
+      })
+      .eq("id", clientId);
+  } else {
     const { data: newClient, error: insErr } = await supabaseAdmin
       .from("clients")
       .insert({
@@ -85,22 +98,10 @@ export default async function handler(
       });
     }
     clientId = newClient.id;
-  } else {
-    // Optional: keep client info fresh
-    await supabaseAdmin
-      .from("clients")
-      .update({
-        first_name: normFirst,
-        last_name: normLast,
-        phone: normPhone,
-        towing_vehicle: towing_vehicle ?? null,
-        comments: comments ?? null,
-      })
-      .eq("id", clientId);
   }
 
-  // --- Create booking ---
-  const access_key = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+  // ------- Create booking -------
+  const access_key = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit
   const pepper = process.env.ACCESS_PEPPER || "";
   const access_key_hash = crypto
     .createHash("sha256")
@@ -114,14 +115,14 @@ export default async function handler(
     .insert({
       rental_id,
       trailer_id,
-      client_id: clientId,
-      start_date,                      // date column
-      end_date,                        // date column
+      client_id: clientId!,
+      start_date,
+      end_date,
       pickup_time: pickup_time || null,
       return_time: return_time || null,
       delivery_requested: !!delivery_requested,
-      status: "Pending",               // enum booking_status('Pending',...)
-      access_key_hash,                 // <-- matches your table
+      status: "Pending",       // booking_status enum in your schema
+      access_key_hash,         // hash column (no plaintext in DB)
     });
 
   if (bookErr) {
@@ -131,8 +132,12 @@ export default async function handler(
       hint: (bookErr as any).hint,
       code: (bookErr as any).code,
     });
-    return res.status(500).json({ ok: false, error: `Booking insert failed: ${bookErr.message}` });
+    return res.status(500).json({
+      ok: false,
+      error: `Booking insert failed: ${bookErr.message}`,
+    });
   }
 
+  // Return creds for the success page
   return res.status(200).json({ ok: true, rental_id, access_key });
 }
