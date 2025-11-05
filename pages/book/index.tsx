@@ -25,7 +25,7 @@ function daysBetween(a: string, b: string) {
 }
 
 type TrailerPick = { id: string; name: string; rate_per_day: number };
-type Conflict = { startDate: string; endDate: string; /* rentalId/status omitted for users */ };
+type Conflict = { startDate: string; endDate: string };
 
 export default function BookPage() {
   const router = useRouter();
@@ -113,7 +113,6 @@ export default function BookPage() {
           setConflicts([]);
         } else {
           setIsAvailable(Boolean(json.available));
-          // Store only dates for end-user messaging (no rental IDs/status)
           const list: Conflict[] = (json.conflicts || []).map((c: any) => ({
             startDate: c.startDate,
             endDate: c.endDate,
@@ -188,19 +187,18 @@ export default function BookPage() {
         return;
       }
 
-                   // Success → redirect with rental + key + name + email, and save for refresh
-        const payloadForSuccess = {
-          rental: json.rental_id,
-          key: json.access_key,
-          name: `${firstName} ${lastName}`.trim(),
-          email,
-        };
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("jla_last_rental", JSON.stringify(payloadForSuccess));
-        }
-        const qs = new URLSearchParams(payloadForSuccess);
-        router.push(`/book/success?${qs.toString()}`);
-
+      // Success → redirect with rental + key + name + email, and save for refresh
+      const payloadForSuccess = {
+        rental: json.rental_id,
+        key: json.access_key,
+        name: `${firstName} ${lastName}`.trim(),
+        email,
+      };
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("jla_last_rental", JSON.stringify(payloadForSuccess));
+      }
+      const qs = new URLSearchParams(payloadForSuccess);
+      router.push(`/book/success?${qs.toString()}`);
 
     } catch (err: any) {
       setFormError(err?.message || "Network error. Please try again.");
@@ -213,9 +211,9 @@ export default function BookPage() {
     borderRadius: 8,
     background: "#0b1220",
     color: "#e5e7eb",
-    border: "1px solid #1f2937",
+    border: "1px solid "#1f2937"",
     colorScheme: "dark",
-  };
+  } as React.CSSProperties;
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // ---------- UI ----------
@@ -280,7 +278,6 @@ export default function BookPage() {
                   <div style={{ fontWeight: 700, marginBottom: 4 }}>
                     Those dates are not available for this trailer.
                   </div>
-                  {/* user-friendly hint (no rental IDs) */}
                   {conflicts.length > 0 && (
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                       {conflicts.map((c, i) => (
@@ -349,7 +346,13 @@ export default function BookPage() {
           {/* Notes */}
           <label style={{ gridColumn: "1 / span 1", display: "grid", gap: 8 }}>
             <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Additional Comments</span>
-            <textarea value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Any details we should know?" rows={5} style={{ ...inputStyle, resize: "vertical" }} />
+            <textarea
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+              placeholder="Any details we should know?"
+              rows={5}
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
           </label>
 
           {/* Quote preview */}
