@@ -14,7 +14,7 @@ export default function Nav() {
   }, [router.events]);
 
   const linkBase: React.CSSProperties = {
-    color: "#ffffff", // white
+    color: "#ffffff",
     textDecoration: "none",
     fontWeight: 700,
     padding: "10px 12px",
@@ -31,7 +31,9 @@ export default function Nav() {
       <div className="nav-wrap">
         {/* Brand (Logo + Title) */}
         <Link href="/" className="brand" aria-label="Home">
-          <img src="/logo.png" alt="JLA Trailer Rentals logo" className="logo" />
+          <div className="logo-wrap">
+            <img src="/logo.png" alt="JLA Trailer Rentals logo" className="logo" />
+          </div>
           <span className="brand-text">JLA Trailer Rentals</span>
         </Link>
 
@@ -96,15 +98,23 @@ export default function Nav() {
         }
 
         .brand {
-          display: inline-flex;
+          display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           text-decoration: none;
         }
 
+        .logo-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+        }
+
         .logo {
-          width: 38px;
-          height: 38px;
+          width: 36px;
+          height: 36px;
           border-radius: 50%;
           object-fit: cover;
           background: #0b1220;
@@ -118,9 +128,10 @@ export default function Nav() {
           letter-spacing: 0.1px;
           line-height: 1;
           display: flex;
-          align-items: center; /* ensures perfect vertical center */
-          transform: translateY(0); /* remove the small offset */
+          align-items: center;
           white-space: nowrap;
+          position: relative;
+          top: 1px; /* small visual tweak to align text center */
         }
 
         .links {
