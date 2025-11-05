@@ -162,11 +162,20 @@ export default function Nav() {
             background: rgba(7, 12, 24, 0.98);
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           }
+
+          /* Drawer links — fully white even on iPhone Safari */
           .drawerLink {
-            color: #ffffff !important; /* White */
+            color: #ffffff !important;
             font-weight: 700;
             font-size: 17px;
             text-decoration: none;
+            -webkit-text-fill-color: #ffffff !important; /* Safari fix */
+            -webkit-tap-highlight-color: transparent;
+          }
+          .drawerLink:visited,
+          .drawerLink:active {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
           }
           .drawerLink:hover {
             color: #3b82f6;
