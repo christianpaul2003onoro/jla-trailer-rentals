@@ -6,12 +6,11 @@ export default function Nav() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // Your repo currently has /public/logo.png.png
-  // If you later rename it to /public/logo.png, just change this one line.
-  const logoSrc = "/logo.png.png";
+  // Updated to use renamed logo file
+  const logoSrc = "/logo.png";
 
   const linkStyle: React.CSSProperties = {
-    color: "#60a5fa", // sky-400 (closer to your original)
+    color: "#60a5fa", // same blue as before
     textDecoration: "none",
     padding: "8px 10px",
     borderRadius: 8,
@@ -29,16 +28,9 @@ export default function Nav() {
     <header className="nav">
       <div className="inner">
         <Link href="/" className="brand" aria-label="Go to homepage">
-          <span className="logoWrap" aria-hidden="true">
-            {/* Use plain <img> so it always shows, and make the bg white so your black logo is visible */}
-            <img
-              src={logoSrc}
-              alt=""
-              width={40}
-              height={40}
-              style={{ width: 40, height: 40, objectFit: "contain", display: "block" }}
-            />
-          </span>
+          <div className="logoBox">
+            <img src={logoSrc} alt="JLA Logo" className="logo" />
+          </div>
           <span className="brandText">JLA Trailer Rentals</span>
         </Link>
 
@@ -84,14 +76,21 @@ export default function Nav() {
           text-decoration: none;
           font-weight: 800;
         }
-        .logoWrap {
+        .logoBox {
           display: inline-flex;
-          width: 40px;
-          height: 40px;
-          border-radius: 999px;
+          align-items: center;
+          justify-content: center;
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
           overflow: hidden;
-          border: 1px solid #e5e7eb; /* thin white ring so it pops */
-          background: #ffffff; /* white bg so your black logo is visible */
+          border: 1px solid #1f2937;
+          background: white; /* makes your black logo visible */
+        }
+        .logo {
+          width: 90%;
+          height: auto;
+          object-fit: contain;
         }
         .brandText {
           line-height: 1;
@@ -122,7 +121,6 @@ export default function Nav() {
             display: none;
           }
         }
-        /* Mobile dropdown */
         .links.open {
           position: absolute;
           top: 56px;
@@ -133,15 +131,6 @@ export default function Nav() {
           padding: 8px;
           display: grid;
           gap: 6px;
-        }
-        @media (min-width: 700px) {
-          .links.open {
-            position: static;
-            display: inline-flex;
-            background: transparent;
-            border: none;
-            padding: 0;
-          }
         }
       `}</style>
     </header>
