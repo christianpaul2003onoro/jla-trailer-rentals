@@ -17,7 +17,6 @@ export default function HomePage() {
       <Nav />
 
       <main>
-        {/* Hero */}
         <section className="hero">
           <div className="overlay" />
           <div className="center">
@@ -26,7 +25,6 @@ export default function HomePage() {
               Reliable trailers. Simple bookings. Local pickup in Miami.
             </p>
 
-            {/* Only these two buttons in the middle */}
             <div className="cta">
               <Link href="/book" className="btn primary">
                 Book a Trailer Rental
@@ -52,16 +50,18 @@ export default function HomePage() {
           background-position: center;
           background-repeat: no-repeat;
         }
+
+        /* SOFTER, balanced overlay — more elegant */
         .overlay {
           position: absolute;
           inset: 0;
-          /* LIGHTER gradient than before (less shade) */
           background: linear-gradient(
             to bottom,
-            rgba(2, 6, 23, 0.28),   /* top */
-            rgba(2, 6, 23, 0.55)    /* bottom */
+            rgba(0, 0, 0, 0.2),
+            rgba(0, 0, 0, 0.45)
           );
         }
+
         .center {
           position: relative;
           z-index: 1;
@@ -70,26 +70,29 @@ export default function HomePage() {
           padding: 48px 16px;
           text-align: center;
         }
+
         h1 {
           margin: 0 0 12px;
           font-size: 44px;
-          line-height: 1.1;
           font-weight: 900;
           color: #ffffff;
           text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
         }
+
         .sub {
           color: #cbd5e1;
           margin: 0 auto 22px;
           max-width: 760px;
           font-size: 18px;
         }
+
         .cta {
           display: inline-flex;
           gap: 12px;
           flex-wrap: wrap;
           justify-content: center;
         }
+
         .btn {
           text-decoration: none;
           border-radius: 10px;
@@ -97,25 +100,25 @@ export default function HomePage() {
           font-weight: 700;
           border: 1px solid #334155;
           color: #e5e7eb;
-          transition: transform 0.05s ease, background 0.2s ease, border-color 0.2s ease;
+          transition: 0.2s ease;
         }
-        .btn:active {
-          transform: translateY(1px);
-        }
+
         .primary {
           background: #2563eb;
           border-color: #1e40af;
           color: white;
         }
+
         .primary:hover {
           background: #1d4ed8;
-          border-color: #1e3a8a;
         }
+
         .ghost {
-          background: rgba(2, 6, 23, 0.35); /* lighter ghost so bg shows */
+          background: rgba(2, 6, 23, 0.4);
         }
+
         .ghost:hover {
-          background: rgba(2, 6, 23, 0.5);
+          background: rgba(2, 6, 23, 0.55);
         }
 
         @media (max-width: 640px) {
@@ -124,9 +127,6 @@ export default function HomePage() {
           }
           .sub {
             font-size: 16px;
-          }
-          .cta {
-            gap: 10px;
           }
         }
       `}</style>
