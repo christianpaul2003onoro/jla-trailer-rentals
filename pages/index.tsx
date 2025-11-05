@@ -1,96 +1,139 @@
-// pages/index.tsx
 import Head from "next/head";
 import Link from "next/link";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer";
 
-export default function Home() {
+export default function HomePage() {
   return (
     <>
-      <Head><title>JLA Trailer Rentals • Reliable, Simple, Local</title></Head>
+      <Head>
+        <title>JLA Trailer Rentals • Reliable trailers in Miami</title>
+        <meta
+          name="description"
+          content="Reliable trailers. Simple bookings. Local pickup in Miami."
+        />
+      </Head>
+
       <Nav />
 
-      {/* HERO */}
-      <section className="hero">
-        <div className="overlay" />
-        <div className="inner">
-          <h1 className="title">JLA Trailer Rentals</h1>
-          <p className="sub">
-            Reliable trailers. Simple bookings. Local pickup in Miami.
-          </p>
+      <main>
+        {/* Hero */}
+        <section className="hero">
+          <div className="overlay" />
+          <div className="center">
+            <h1>JLA Trailer Rentals</h1>
+            <p className="sub">
+              Reliable trailers. Simple bookings. Local pickup in Miami.
+            </p>
 
-          {/* Only the two buttons you want, centered, and working */}
-          <div className="btns">
-            <Link href="/book" className="btn primary">Book a Trailer Rental</Link>
-            <Link href="/find" className="btn ghost">Find My Rental</Link>
+            {/* Keep only the two buttons in the middle */}
+            <div className="cta">
+              <Link href="/book" className="btn primary">
+                Book a Trailer Rental
+              </Link>
+              <Link href="/find" className="btn ghost">
+                Find My Rental
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </main>
 
       <Footer />
 
       <style jsx>{`
         .hero {
           position: relative;
-          min-height: 72vh;
-          background: url("/hero.jpg") center/cover no-repeat; /* your existing hero image path */
+          min-height: 76vh;
           display: grid;
           place-items: center;
+          /* Your wallpaper lives in /public — this path is correct */
+          background-image: url("/home_page_background_wallpaper.png");
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
         }
         .overlay {
-          position: absolute; inset: 0;
-          background: radial-gradient(ellipse at center, rgba(0,0,0,.35), rgba(0,0,0,.55));
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+              to bottom,
+              rgba(2, 6, 23, 0.55),
+              rgba(2, 6, 23, 0.85)
+            ),
+            radial-gradient(
+              circle at 50% 40%,
+              rgba(2, 6, 23, 0.3),
+              rgba(2, 6, 23, 0.9) 70%
+            );
         }
-        .inner {
+        .center {
           position: relative;
-          max-width: 900px;
-          padding: 0 16px;
+          z-index: 1;
+          max-width: 960px;
+          margin: 0 auto;
+          padding: 48px 16px;
           text-align: center;
         }
-        .title {
-          font-size: 48px;
-          line-height: 1.05;
+        h1 {
+          margin: 0 0 12px;
+          font-size: 44px;
+          line-height: 1.1;
           font-weight: 900;
-          color: #fff;
-          text-shadow: 0 2px 12px rgba(0,0,0,.45);
-          margin: 0 0 10px;
+          color: #ffffff;
+          text-shadow: 0 2px 18px rgba(0, 0, 0, 0.5);
         }
         .sub {
-          color: #d1d5db;
+          color: #cbd5e1;
+          margin: 0 auto 22px;
+          max-width: 760px;
           font-size: 18px;
-          margin: 0 0 22px;
-          text-shadow: 0 1px 8px rgba(0,0,0,.35);
         }
-        .btns {
-          display: flex;
+        .cta {
+          display: inline-flex;
           gap: 12px;
-          justify-content: center;
           flex-wrap: wrap;
+          justify-content: center;
         }
         .btn {
-          display: inline-block;
           text-decoration: none;
-          font-weight: 700;
           border-radius: 10px;
           padding: 12px 16px;
-          border: 1px solid #1f2937;
+          font-weight: 700;
+          border: 1px solid #334155;
           color: #e5e7eb;
-          background: rgba(11, 18, 32, 0.75);
-          backdrop-filter: blur(6px);
+          transition: transform 0.05s ease, background 0.2s ease,
+            border-color 0.2s ease;
         }
-        .btn:hover { border-color: #1e3a8a; }
+        .btn:active {
+          transform: translateY(1px);
+        }
         .primary {
           background: #2563eb;
           border-color: #1e40af;
-          color: #fff;
+          color: white;
         }
-        .primary:hover { background: #1d4ed8; }
-        .ghost { background: rgba(11,18,32,0.85); }
+        .primary:hover {
+          background: #1d4ed8;
+          border-color: #1e3a8a;
+        }
+        .ghost {
+          background: rgba(2, 6, 23, 0.5);
+        }
+        .ghost:hover {
+          background: rgba(2, 6, 23, 0.7);
+        }
 
         @media (max-width: 640px) {
-          .title { font-size: 36px; }
-          .sub { font-size: 16px; }
-          .btn { width: 100%; max-width: 320px; }
+          h1 {
+            font-size: 34px;
+          }
+          .sub {
+            font-size: 16px;
+          }
+          .cta {
+            gap: 10px;
+          }
         }
       `}</style>
     </>
