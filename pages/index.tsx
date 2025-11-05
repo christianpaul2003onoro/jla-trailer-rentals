@@ -15,67 +15,79 @@ export default function Home() {
         />
       </Head>
 
+      {/* Page wrapper: full-viewport background + overlay */}
       <div className="page">
+        {/* Top nav (your existing component) */}
         <Nav />
 
-        {/* --- HERO SECTION --- */}
+        {/* HERO */}
         <main className="hero">
-          <div className="content">
+          <div className="heroInner">
             <h1>JLA Trailer Rentals</h1>
-            <p>Reliable trailers. Simple bookings. Local pickup in Miami.</p>
 
-            <div className="buttons">
-              <Link href="/book" className="primary">
+            <p className="tagline">
+              Reliable trailers. Simple bookings. Local pickup in Miami.
+            </p>
+
+            <div className="btnRow">
+              <Link href="/book" className="btnPrimary">
                 Book a Trailer Rental
               </Link>
-              <Link href="/find" className="secondary">
+
+              <Link href="/find" className="btnSecondary">
                 Find My Rental
               </Link>
             </div>
           </div>
         </main>
 
+        {/* Footer stays visible without scroll */}
         <Footer />
       </div>
 
       <style jsx>{`
+        /* --- Layout & background --- */
         .page {
-          position: relative;
+          /* Full-screen canvas with your image */
           min-height: 100vh;
-          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between; /* nav at top, footer at bottom, hero fills middle */
           background-color: #0b1220;
           background-image: url("/home_page_background_wallpaper.png");
           background-size: cover;
           background-position: center;
           background-repeat: no-repeat;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
+          position: relative;
+          overflow: hidden; /* no scroll */
         }
-
-        /* Overlay for better text readability */
+        /* Readability overlay behind everything */
         .page::before {
           content: "";
           position: absolute;
           inset: 0;
-          background: rgba(0, 0, 0, 0.45);
+          background: linear-gradient(
+            to bottom,
+            rgba(2, 6, 23, 0.25),
+            rgba(2, 6, 23, 0.55)
+          );
           z-index: 0;
         }
 
+        /* --- Hero --- */
         .hero {
           position: relative;
-          z-index: 1;
-          flex: 1;
+          z-index: 1; /* above overlay */
+          flex: 1; /* fill between nav and footer */
           display: flex;
-          flex-direction: column;
-          justify-content: center;
           align-items: center;
+          justify-content: center;
           text-align: center;
           padding: 0 16px;
         }
-
-        .content {
-          max-width: 900px;
+        .heroInner {
+          width: 100%;
+          max-width: 1100px;
           margin: 0 auto;
         }
 
@@ -83,23 +95,25 @@ export default function Home() {
           font-size: 42px;
           font-weight: 800;
           color: #ffffff;
-          margin-bottom: 10px;
+          margin: 0 0 10px 0;
         }
 
-        p {
+        .tagline {
           color: #cbd5e1;
           font-size: 18px;
-          margin-bottom: 24px;
+          margin: 0 0 24px 0;
+          font-weight: 400;
         }
 
-        .buttons {
+        .btnRow {
           display: flex;
           gap: 12px;
           justify-content: center;
           flex-wrap: wrap;
         }
 
-        .primary {
+        /* --- Buttons (exact look you liked) --- */
+        .btnPrimary {
           background: #2563eb;
           border: 1px solid #1e40af;
           color: #ffffff;
@@ -109,33 +123,32 @@ export default function Home() {
           text-decoration: none;
           font-size: 16px;
         }
+        .btnPrimary:hover {
+          opacity: 0.96;
+        }
 
-        .secondary {
+        .btnSecondary {
           background: rgba(2, 6, 23, 0.55);
-          border: 2px solid #ffffff;
-          color: #ffffff;
+          border: 2px solid #ffffff; /* white border */
+          color: #ffffff;            /* white text */
           padding: 12px 18px;
           border-radius: 10px;
           font-weight: 800;
           text-decoration: none;
           font-size: 16px;
         }
-
-        .primary:hover {
-          opacity: 0.95;
-        }
-
-        .secondary:hover {
-          background: rgba(2, 6, 23, 0.65);
+        .btnSecondary:hover {
           border-color: #e5e7eb;
+          background: rgba(2, 6, 23, 0.65);
         }
 
+        /* --- Mobile tweaks --- */
         @media (max-width: 480px) {
           h1 {
             font-size: 34px;
           }
-          .primary,
-          .secondary {
+          .btnPrimary,
+          .btnSecondary {
             padding: 11px 16px;
             font-size: 15px;
             font-weight: 800;
