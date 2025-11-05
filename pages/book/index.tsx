@@ -198,7 +198,10 @@ export default function BookPage() {
         sessionStorage.setItem("jla_last_rental", JSON.stringify(payloadForSuccess));
       }
       const qs = new URLSearchParams(payloadForSuccess);
-      router.push(`/book/success?${qs.toString()}`);
+// Debug (optional): verify we’re sending the values you expect
+console.log("Booking → Success params:", Object.fromEntries(qs.entries()));
+router.push(`/book/success?${qs.toString()}`);
+
 
     } catch (err: any) {
       setFormError(err?.message || "Network error. Please try again.");
