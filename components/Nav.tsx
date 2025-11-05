@@ -29,10 +29,12 @@ export default function Nav() {
   return (
     <header className="nav-root">
       <div className="nav-wrap">
-        {/* Brand (Logo + Title) */}
+        {/* ✅ Brand (Logo + Title centered vertically) */}
         <Link href="/" className="brand" aria-label="Home">
-          <img src="/logo.png" alt="JLA Trailer Rentals logo" className="logo" />
-          <span className="brand-text">JLA Trailer Rentals</span>
+          <div className="brand-group">
+            <img src="/logo.png" alt="JLA Trailer Rentals logo" className="logo" />
+            <span className="brand-text">JLA Trailer Rentals</span>
+          </div>
         </Link>
 
         {/* Desktop links */}
@@ -49,11 +51,7 @@ export default function Nav() {
         </nav>
 
         {/* Hamburger */}
-        <button
-          className="hamburger"
-          aria-label="Menu"
-          onClick={() => setOpen((v) => !v)}
-        >
+        <button className="hamburger" aria-label="Menu" onClick={() => setOpen((v) => !v)}>
           <span></span>
           <span></span>
           <span></span>
@@ -95,11 +93,14 @@ export default function Nav() {
           gap: 12px;
         }
 
+        /* ✅ Brand alignment fix */
         .brand {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
           text-decoration: none;
+        }
+        .brand-group {
+          display: inline-flex;
+          align-items: center; /* centers logo + text perfectly */
+          gap: 10px;
         }
 
         .logo {
@@ -117,7 +118,6 @@ export default function Nav() {
           font-size: 18px;
           letter-spacing: 0.1px;
           line-height: 1;
-          transform: translateY(1px);
           white-space: nowrap;
         }
 
