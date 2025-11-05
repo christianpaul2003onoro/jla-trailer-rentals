@@ -187,22 +187,32 @@ export default function BookPage() {
         return;
       }
 
-      // Success → redirect with rental + key + name + email, and save for refresh
+      // Success → redirect with rental + key + name + email, save for refresh
       const payloadForSuccess = {
         rental: json.rental_id,
         key: json.access_key,
         name: `${firstName} ${lastName}`.trim(),
         email,
       };
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("jla_last_rental", JSON.stringify(payloadForSuccess));
-      }
+
+      // Persist in both storages (covers refresh / router timing)
+      try {
+        if (typeof window !== "undefined") {
+          const s = JSON.stringify(payloadForSuccess);
+          sessionStorage.setItem("jla_last_rental", s);
+          localStorage.setItem("jla_last_rental", s);
+        }
+      } catch {}
+
       const qs = new URLSearchParams(payloadForSuccess);
-// Debug (optional): verify we’re sending the values you expect
-console.log("Booking → Success params:", Object.fromEntries(qs.entries()));
-router.push(`/book/success?${qs.toString()}`);
 
-
+      // Hard navigation to preserve full query reliably
+      if (typeof window !== "undefined") {
+        console.log("Booking → Success params:", Object.fromEntries(qs.entries()));
+        window.location.assign(`/book/success?${qs.toString()}`);
+      } else {
+        router.push(`/book/success?${qs.toString()}`);
+      }
     } catch (err: any) {
       setFormError(err?.message || "Network error. Please try again.");
     }
@@ -210,13 +220,13 @@ router.push(`/book/success?${qs.toString()}`);
 
   // ---------- styles ----------
   const inputStyle: React.CSSProperties = {
-  padding: 10,
-  borderRadius: 8,
-  background: "#0b1220",
-  color: "#e5e7eb",
-  border: "1px solid #1f2937",
-  colorScheme: "dark",
-  } as React.CSSProperties;
+    padding: 10,
+    borderRadius: 8,
+    background: "#0b1220",
+    color: "#e5e7eb",
+    border: "1px solid #1f2937",
+    colorScheme: "dark",
+  };
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // ---------- UI ----------
@@ -260,7 +270,7 @@ router.push(`/book/success?${qs.toString()}`);
               {errors.endDate && <small style={{ color: "#fca5a5" }}>{errors.endDate}</small>}
             </label>
 
-            {/* Availability banner (spans both date columns) */}
+            {/* Availability banner */}
             <div style={{ gridColumn: "1 / span 2" }}>
               {checkingAvail && <div style={{ color: "#93c5fd" }}>Checking availability…</div>}
 
