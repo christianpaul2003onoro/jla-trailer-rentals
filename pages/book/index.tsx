@@ -188,14 +188,19 @@ export default function BookPage() {
         return;
       }
 
-            // Success → redirect with rental + key + name + email (for success page)
-      const qs = new URLSearchParams({
-        rental: json.rental_id,
-        key: json.access_key,
-        name: `${firstName} ${lastName}`.trim(),
-        email,
-      });
-      router.push(`/book/success?${qs.toString()}`);
+                   // Success → redirect with rental + key + name + email, and save for refresh
+        const payloadForSuccess = {
+          rental: json.rental_id,
+          key: json.access_key,
+          name: `${firstName} ${lastName}`.trim(),
+          email,
+        };
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("jla_last_rental", JSON.stringify(payloadForSuccess));
+        }
+        const qs = new URLSearchParams(payloadForSuccess);
+        router.push(`/book/success?${qs.toString()}`);
+
 
     } catch (err: any) {
       setFormError(err?.message || "Network error. Please try again.");
