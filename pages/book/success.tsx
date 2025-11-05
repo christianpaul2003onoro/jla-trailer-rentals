@@ -1,4 +1,3 @@
-// pages/book/success.tsx
 import Head from "next/head";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -11,32 +10,43 @@ export default function BookingSuccess() {
   const [creds, setCreds] = useState<Creds | null>(null);
 
   useEffect(() => {
-    // 1) Parse query from the URL (avoids Next.js router timing)
+    // 1) URL query
     try {
       const qs = new URLSearchParams(window.location.search);
       const rental = qs.get("rental") || "";
-      const key    = qs.get("key") || "";
-      const name   = qs.get("name") || "";
-      const email  = qs.get("email") || "";
-
+      const key = qs.get("key") || "";
+      const name = qs.get("name") || "";
+      const email = qs.get("email") || "";
       if (rental && key) {
         const v = { rental, key, name, email };
         setCreds(v);
-        sessionStorage.setItem("jla_last_rental", JSON.stringify(v));
+        const s = JSON.stringify(v);
+        sessionStorage.setItem("jla_last_rental", s);
+        localStorage.setItem("jla_last_rental", s);
         return;
       }
-    } catch { /* ignore */ }
+    } catch {}
 
-    // 2) Fallback: sessionStorage (covers refresh)
+    // 2) sessionStorage
     try {
       const raw = sessionStorage.getItem("jla_last_rental");
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.rental && parsed?.key) {
-          setCreds(parsed);
+        const v = JSON.parse(raw);
+        if (v?.rental && v?.key) {
+          setCreds(v);
+          return;
         }
       }
-    } catch { /* ignore */ }
+    } catch {}
+
+    // 3) localStorage (last resort)
+    try {
+      const raw = localStorage.getItem("jla_last_rental");
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (v?.rental && v?.key) setCreds(v);
+      }
+    } catch {}
   }, []);
 
   const findUrl = creds
