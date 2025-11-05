@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 export default function Nav() {
   const [open, setOpen] = useState(false);
 
+  // Close the drawer when orientation or size changes
   useEffect(() => {
     const close = () => setOpen(false);
     window.addEventListener("resize", close);
@@ -19,7 +20,7 @@ export default function Nav() {
   return (
     <>
       <header className="nav">
-        {/* Left logo */}
+        {/* Left: logo */}
         <Link href="/" className="brandLeft" aria-label="Home">
           <span className="logoWrap">
             <Image
@@ -32,22 +33,22 @@ export default function Nav() {
           </span>
         </Link>
 
-        {/* Center title */}
+        {/* Center: brand name */}
         <Link href="/" className="brandCenter">
           JLA Trailer Rentals
         </Link>
 
-        {/* Right links (desktop + landscape) */}
+        {/* Right: links (desktop / landscape) */}
         <nav className="links">
-          <Link href="/fleet">Our Fleet</Link>
-          <Link href="/book">Book</Link>
-          <Link href="/find">Find My Rental</Link>
+          <Link href="/fleet" className="navLink">Our Fleet</Link>
+          <Link href="/book" className="navLink">Book</Link>
+          <Link href="/find" className="navLink">Find My Rental</Link>
         </nav>
 
-        {/* Hamburger (only mobile portrait) */}
+        {/* Hamburger (mobile portrait only) */}
         <button
           className="hamburger"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(v => !v)}
           aria-label="Open menu"
           aria-expanded={open ? "true" : "false"}
         >
@@ -60,15 +61,9 @@ export default function Nav() {
       {/* Drawer menu */}
       {open && (
         <div className="drawer">
-          <Link href="/fleet" className="drawerLink" onClick={() => setOpen(false)}>
-            Our Fleet
-          </Link>
-          <Link href="/book" className="drawerLink" onClick={() => setOpen(false)}>
-            Book
-          </Link>
-          <Link href="/find" className="drawerLink" onClick={() => setOpen(false)}>
-            Find My Rental
-          </Link>
+          <Link href="/fleet" className="drawerLink" onClick={() => setOpen(false)}>Our Fleet</Link>
+          <Link href="/book"  className="drawerLink" onClick={() => setOpen(false)}>Book</Link>
+          <Link href="/find"  className="drawerLink" onClick={() => setOpen(false)}>Find My Rental</Link>
         </div>
       )}
 
@@ -88,7 +83,7 @@ export default function Nav() {
           backdrop-filter: blur(8px);
         }
 
-        /* Left logo */
+        /* Logo holder (circle) */
         .logoWrap {
           width: 36px;
           height: 36px;
@@ -99,31 +94,34 @@ export default function Nav() {
           overflow: hidden;
         }
 
-        /* Center title */
-        .brandCenter {
+        /* Center title (force WHITE incl. visited) */
+        .brandCenter,
+        .brandCenter:visited {
           justify-self: center;
-          color: #ffffff; /* WHITE text */
+          color: #ffffff !important;
           font-weight: 800;
           font-size: 18px;
           text-decoration: none;
+          letter-spacing: 0.2px;
         }
 
-        /* Desktop/landscape links */
+        /* Right links (desktop / landscape) */
         .links {
           display: flex;
           align-items: center;
           gap: 18px;
         }
-        .links :global(a) {
-          color: #ffffff; /* WHITE text */
+        .navLink,
+        .navLink:visited {
+          color: #ffffff !important;     /* Force WHITE */
           text-decoration: none;
           font-weight: 600;
         }
-        .links :global(a:hover) {
+        .navLink:hover {
           color: #93c5fd;
         }
 
-        /* Hamburger */
+        /* Hamburger button */
         .hamburger {
           display: none;
           flex-direction: column;
@@ -138,15 +136,16 @@ export default function Nav() {
         .bar {
           width: 20px;
           height: 2px;
-          background: #ffffff; /* White bars */
+          background: #ffffff;  /* white bars */
           border-radius: 2px;
         }
 
-        /* Drawer */
+        /* Drawer (hidden by default) */
         .drawer {
           display: none;
         }
 
+        /* Show hamburger & drawer only on mobile PORTRAIT */
         @media (max-width: 768px) and (orientation: portrait) {
           .links {
             display: none;
@@ -154,7 +153,6 @@ export default function Nav() {
           .hamburger {
             display: flex;
           }
-
           .drawer {
             display: grid;
             gap: 14px;
@@ -162,20 +160,13 @@ export default function Nav() {
             background: rgba(7, 12, 24, 0.98);
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           }
-
-          /* Drawer links — fully white even on iPhone Safari */
-          .drawerLink {
+          /* Drawer links → FORCE WHITE (normal + visited) */
+          .drawerLink,
+          .drawerLink:visited {
             color: #ffffff !important;
             font-weight: 700;
             font-size: 17px;
             text-decoration: none;
-            -webkit-text-fill-color: #ffffff !important; /* Safari fix */
-            -webkit-tap-highlight-color: transparent;
-          }
-          .drawerLink:visited,
-          .drawerLink:active {
-            color: #ffffff !important;
-            -webkit-text-fill-color: #ffffff !important;
           }
           .drawerLink:hover {
             color: #3b82f6;
