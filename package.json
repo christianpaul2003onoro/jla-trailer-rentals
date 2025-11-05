@@ -21,9 +21,4 @@
     "@types/cookie": "^0.6.0"
   }
 
-  "dependencies": {
-  "resend": "^4.0.0",
-  "@react-email/components": "^0.0.17"
-}
-
 }
