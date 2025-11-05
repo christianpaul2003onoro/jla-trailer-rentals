@@ -153,8 +153,20 @@ export default function FindMyRental() {
             </div>
             <div style={{ color: "#cbd5e1" }}>Trailer: <strong>{result.trailer.name}</strong></div>
             <div style={{ color: "#cbd5e1" }}>
-              Dates: {result.start_date} → {result.end_date}
+              Dates:{" "}
+              {new Date(result.start_date).toLocaleDateString("en-US", {
+                month: "2-digit",
+                day: "2-digit",
+                year: "numeric",
+              })}{" "}
+              →{" "}
+              {new Date(result.end_date).toLocaleDateString("en-US", {
+                month: "2-digit",
+                day: "2-digit",
+                year: "numeric",
+              })}
             </div>
+
             <div style={{ color: "#cbd5e1" }}>
               Pickup: {result.pickup_time || "—"} | Return: {result.return_time || "—"}
             </div>
