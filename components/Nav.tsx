@@ -103,21 +103,23 @@ export default function Nav() {
         }
 
         .logo {
-          width: 36px;
-          height: 36px;
-          border-radius: 9999px;
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
           object-fit: cover;
           background: #0b1220;
           border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .brand-text {
-          color: #ffffff; /* White */
+          color: #ffffff;
           font-weight: 800;
           font-size: 18px;
           letter-spacing: 0.1px;
           line-height: 1;
-          transform: translateY(1px);
+          display: flex;
+          align-items: center; /* ensures perfect vertical center */
+          transform: translateY(0); /* remove the small offset */
           white-space: nowrap;
         }
 
