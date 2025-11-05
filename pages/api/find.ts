@@ -32,11 +32,14 @@ export default async function handler(
   if (!rental?.trim()) return res.status(400).json({ ok: false, error: "Rental ID required." });
   if (!key?.trim())    return res.status(400).json({ ok: false, error: "Access Key required." });
 
-  // Hash the key the same way we did when creating the booking
+  // Hash key the same way as when we saved it
   const pepper = process.env.ACCESS_PEPPER || "";
-  const access_key_hash = crypto.createHash("sha256").update(String(key) + pepper).digest("hex");
+  const access_key_hash = crypto
+    .createHash("sha256")
+    .update(String(key) + pepper)
+    .digest("hex");
 
-  // Find the booking using rental_id + access_key_hash
+  // Fetch booking + trailer info
   const { data, error } = await supabaseAdmin
     .from("bookings")
     .select(
@@ -48,7 +51,7 @@ export default async function handler(
       pickup_time,
       return_time,
       delivery_requested,
-      trailers!bookings_trailer_id_fkey ( name, rate_per_day )
+      trailers:trailers!bookings_trailer_id_fkey ( name, rate_per_day )
     `
     )
     .eq("rental_id", rental.trim())
@@ -58,6 +61,11 @@ export default async function handler(
 
   if (error) return res.status(500).json({ ok: false, error: "Lookup failed." });
   if (!data)  return res.status(404).json({ ok: false, error: "Not found. Check your Rental ID and Key." });
+
+  // trailers can be an object OR an array depending on types — normalize it
+  const tRaw: any = (Array.isArray((data as any).trailers) ? (data as any).trailers[0] : (data as any).trailers) || {};
+  const trailerName = tRaw?.name ?? "Trailer";
+  const trailerRate = Number(tRaw?.rate_per_day ?? 0);
 
   return res.status(200).json({
     ok: true,
@@ -69,10 +77,7 @@ export default async function handler(
       pickup_time: data.pickup_time,
       return_time: data.return_time,
       delivery_requested: !!data.delivery_requested,
-      trailer: {
-        name: data.trailers?.name ?? "Trailer",
-        rate_per_day: Number(data.trailers?.rate_per_day ?? 0),
-      },
+      trailer: { name: trailerName, rate_per_day: trailerRate },
     },
   });
 }
