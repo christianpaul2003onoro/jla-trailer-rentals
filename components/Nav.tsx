@@ -182,17 +182,6 @@ export default function Nav() {
           .brand-text {
             font-size: 16px;
           }
-          /* inside <style jsx> of Nav.tsx */
-.nav-root {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: rgba(2, 6, 23, 0.60);   /* more see-through */
-  backdrop-filter: saturate(160%) blur(6px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-          
           .logo {
             width: 32px;
             height: 32px;
