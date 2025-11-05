@@ -17,7 +17,7 @@ export default function Nav() {
   }, []);
 
   return (
-    <>
+    <> {/* ⬅️ OPEN fragment */}
       <header className="nav">
         <Link href="/" className="brandLeft" aria-label="Home">
           <span className="logoWrap">
@@ -51,48 +51,49 @@ export default function Nav() {
         </div>
       )}
 
-      // components/Nav.tsx  (only the <style jsx> block changed)
-<style jsx>{`
-  .nav {
-    position: sticky; top: 0; z-index: 50;
-    display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px;
-    height: 64px; padding: 0 14px;
-    background: rgba(7,12,24,0.90);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    backdrop-filter: blur(8px);
-  }
-  .logoWrap { width: 36px; height: 36px; display:grid; place-items:center; background:#0b1220; border-radius:999px; overflow:hidden; }
+      <style jsx>{`
+        .nav {
+          position: sticky; top: 0; z-index: 50;
+          display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 12px;
+          height: 64px; padding: 0 14px;
+          background: rgba(7,12,24,0.90);
+          border-bottom: 1px solid rgba(255,255,255,0.06);
+          backdrop-filter: blur(8px);
+        }
+        .logoWrap { width: 36px; height: 36px; display:grid; place-items:center; background:#0b1220; border-radius:999px; overflow:hidden; }
 
-  /* 🔒 THIS is the key: white for every anchor state inside the nav */
-  .nav :where(a, a:link, a:visited, a:hover, a:active) {
-    color: #ffffff !important;
-    text-decoration: none;
-  }
+        /* 🔒 Force WHITE for all anchor states inside the navbar */
+        .nav :where(a, a:link, a:visited, a:hover, a:active) {
+          color: #ffffff !important;
+          text-decoration: none;
+        }
 
-  .brandCenter { justify-self:center; font-weight:800; font-size:18px; letter-spacing:.2px; }
-  .links { display:flex; align-items:center; gap:18px; }
-  .navLink { font-weight:700; }
-  .navLink:hover { color:#e6f0ff !important; }
+        .brandCenter { justify-self:center; font-weight:800; font-size:18px; letter-spacing:.2px; }
 
-  .hamburger { display:none; width:44px; height:44px; border:1px solid rgba(255,255,255,.15); border-radius:10px; background:transparent; }
-  .bar { width:20px; height:2px; background:#fff; border-radius:2px; }
-  .drawer { display:none; }
+        .links { display:flex; align-items:center; gap:18px; }
+        .navLink { font-weight:700; }
+        .navLink:hover { color:#e6f0ff !important; }
 
-  @media (max-width:768px) and (orientation:portrait) {
-    .links { display:none; }
-    .hamburger { display:flex; flex-direction:column; justify-content:center; gap:4px; }
-    .drawer {
-      display:grid; gap:14px; padding:16px;
-      background:rgba(7,12,24,.98);
-      border-bottom:1px solid rgba(255,255,255,.08);
-    }
-    /* 🔒 drawer links white in all states too */
-    .drawer :where(a, a:link, a:visited, a:hover, a:active) {
-      color:#ffffff !important; font-weight:700; font-size:17px; text-decoration:none;
-    }
-  }
-`}</style>
+        .hamburger { display:none; width:44px; height:44px; border:1px solid rgba(255,255,255,.15); border-radius:10px; background:transparent; }
+        .bar { width:20px; height:2px; background:#fff; border-radius:2px; }
 
-    </>
+        .drawer { display:none; }
+
+        @media (max-width:768px) and (orientation:portrait) {
+          .links { display:none; }
+          .hamburger { display:flex; flex-direction:column; justify-content:center; gap:4px; }
+          .drawer {
+            display:grid; gap:14px; padding:16px;
+            background:rgba(7,12,24,.98);
+            border-bottom:1px solid rgba(255,255,255,.08);
+          }
+          /* 🔒 Drawer links white in all states */
+          .drawer :where(a, a:link, a:visited, a:hover, a:active) {
+            color:#ffffff !important; font-weight:700; font-size:17px; text-decoration:none;
+          }
+          .drawer a:hover { color:#e6f0ff !important; }
+        }
+      `}</style>
+    </>  /* ⬅️ CLOSE fragment — prevents the compile error */
   );
 }
