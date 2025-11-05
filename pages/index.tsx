@@ -4,145 +4,127 @@ import Link from "next/link";
 import Nav from "../components/Nav";
 import Footer from "../components/Footer";
 
-export default function Home() {
+export default function HomePage() {
   return (
     <>
-      <Head>
-        <title>JLA Trailer Rentals • Reliable Local Trailer Rentals in Miami</title>
-      </Head>
-
+      <Head><title>JLA Trailer Rentals • Miami</title></Head>
       <Nav />
 
-      {/* HERO SECTION */}
-      <main
-        style={{
-          position: "relative",
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          overflow: "hidden",
-          backgroundColor: "#0b1220",
-        }}
-      >
+      <header className="hero">
         {/* Background image */}
         <img
           src="/home_page_background_wallpaper.png"
-          alt="Truck towing trailer at sunset"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            zIndex: 0,
-          }}
+          alt=""
+          className="bg"
         />
+        {/* Soft dark overlay */}
+        <div className="overlay" />
 
-        {/* Overlay */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to bottom, rgba(2,6,23,0.25), rgba(2,6,23,0.55))", // slightly stronger for readability
-            zIndex: 1,
-          }}
-        />
+        {/* Center content */}
+        <div className="center">
+          <h1>JLA Trailer Rentals</h1>
+          <p>Reliable trailers. Simple bookings. Local pickup in Miami.</p>
 
-        {/* Content */}
-        <div style={{ zIndex: 2, padding: "0 16px" }}>
-          <h1
-            style={{
-              fontSize: "42px",
-              fontWeight: 800,
-              color: "white",
-              marginBottom: 10,
-            }}
-          >
-            JLA Trailer Rentals
-          </h1>
-          <p
-            style={{
-              color: "#cbd5e1",
-              fontSize: 18,
-              marginBottom: 24,
-              fontWeight: 400,
-            }}
-          >
-            Reliable trailers. Simple bookings. Local pickup in Miami.
-          </p>
-
-          {/* --- HERO BUTTONS --- */}
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              justifyContent: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            {/* Primary Button */}
-            <Link
-              href="/book"
-              className="heroPrimaryBtn"
-              style={{
-                background: "#2563eb",
-                border: "1px solid #1e40af",
-                color: "#fff",
-                padding: "12px 18px",
-                borderRadius: 10,
-                fontWeight: 800,
-                textDecoration: "none",
-                fontSize: 16,
-              }}
-            >
-              Book a Trailer Rental
-            </Link>
-
-            {/* Secondary Button */}
-            <Link
-              href="/find"
-              className="heroSecondaryBtn"
-              style={{
-                background: "rgba(2,6,23,0.55)", // subtle dark glass
-                border: "2px solid #60a5fa", // visible bright blue border
-                color: "#bfdbfe", // light blue text
-                padding: "12px 18px",
-                borderRadius: 10,
-                fontWeight: 800,
-                textDecoration: "none",
-                fontSize: 16,
-              }}
-            >
-              Find My Rental
-            </Link>
+          <div className="ctaRow">
+            <Link href="/book" className="btnPrimary">Book a Trailer Rental</Link>
+            <Link href="/find" className="btnOutline">Find My Rental</Link>
           </div>
-
-          {/* Hover styles */}
-          <style jsx>{`
-            .heroPrimaryBtn:hover {
-              opacity: 0.96;
-            }
-            .heroSecondaryBtn:hover {
-              border-color: #93c5fd;
-              color: #e5effe;
-              background: rgba(2, 6, 23, 0.65);
-            }
-            @media (max-width: 420px) {
-              .heroPrimaryBtn,
-              .heroSecondaryBtn {
-                padding: 11px 16px;
-                font-weight: 800;
-              }
-            }
-          `}</style>
         </div>
-      </main>
+      </header>
 
       <Footer />
+
+      <style jsx>{`
+        .hero {
+          position: relative;
+          min-height: 72vh;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          border-bottom: 1px solid #0f1a2e;
+        }
+        .bg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(1.02);
+          filter: saturate(105%);
+        }
+        .overlay {
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(
+              1200px 600px at 50% 60%,
+              rgba(0,0,0,0.10),
+              rgba(0,0,0,0.45)
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(7,12,24,0.15),
+              rgba(7,12,24,0.55)
+            );
+        }
+        .center {
+          position: relative;
+          text-align: center;
+          padding: 40px 16px 60px;
+          max-width: 980px;
+          z-index: 1;
+        }
+        h1 {
+          margin: 0 0 8px;
+          font-size: clamp(32px, 5.3vw, 56px);
+          font-weight: 900;
+          color: #ffffff;
+          text-shadow: 0 10px 35px rgba(0,0,0,0.55);
+        }
+        p {
+          margin: 0 0 22px;
+          color: #dbeafe;
+          font-weight: 500;
+          text-shadow: 0 8px 30px rgba(0,0,0,0.55);
+        }
+
+        .ctaRow {
+          display: inline-flex;
+          gap: 14px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .btnPrimary, .btnOutline {
+          display: inline-block;
+          border-radius: 12px;
+          padding: 12px 18px;
+          font-weight: 800;
+          text-decoration: none;
+          transition: transform .05s ease, box-shadow .15s ease, background .15s ease;
+        }
+        .btnPrimary {
+          background: #2563eb;
+          color: #ffffff;
+          border: 1px solid #1e40af;
+          box-shadow: 0 8px 26px rgba(37,99,235,0.35);
+        }
+        .btnPrimary:hover { transform: translateY(-1px); }
+
+        .btnOutline {
+          color: #e5e7eb;
+          background: rgba(3,7,18,0.25);
+          border: 2px solid rgba(255,255,255,0.85); /* stronger, visible outline */
+          backdrop-filter: blur(2px);
+        }
+        .btnOutline:hover { transform: translateY(-1px); }
+
+        @media (max-width: 480px) {
+          .btnPrimary, .btnOutline {
+            width: 100%;
+            text-align: center;
+          }
+        }
+      `}</style>
     </>
   );
 }
