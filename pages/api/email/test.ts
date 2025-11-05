@@ -4,13 +4,14 @@ import { getResend } from "../../../lib/email/resend";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const resend = getResend();
-    const data = await resend.emails.send({
-      // Use this sender for initial tests. It works without a verified domain.
-      from: "JLA Trailer Rentals <onboarding@resend.dev>",
-      to: ["JLAtrailerrental@gmail.com"], // change if you want
-      subject: "JLA test email",
-      html: `<p>Congrats! Resend is working on jlatrailers.com 🚚</p>`,
-    });
+   // pages/api/email/test.ts
+const data = await resend.emails.send({
+  from: "JLA Trailer Rentals <onboarding@resend.dev>",
+  to: ["christianpaul2003onoro@gmail.com"], // ← must be the same email on your Resend account
+  subject: "JLA test email",
+  html: `<p>Congrats! Resend is working 🚚</p>`,
+});
+
 
     return res.status(200).json({ ok: true, data });
   } catch (err: any) {
