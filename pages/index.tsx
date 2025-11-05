@@ -1,4 +1,3 @@
-// pages/index.tsx
 import Head from "next/head";
 import Link from "next/link";
 import Nav from "../components/Nav";
@@ -45,30 +44,31 @@ export default function HomePage() {
           height: 100%;
           object-fit: cover;
         }
+        /* slight, even darkening like your photo */
         .overlay {
-          position: absolute;
-          inset: 0;
+          position: absolute; inset: 0;
           background: linear-gradient(
-              to bottom,
-              rgba(0, 0, 0, 0.2),
-              rgba(0, 0, 0, 0.6)
-            );
+            to bottom,
+            rgba(0,0,0,.18),
+            rgba(0,0,0,.50)
+          );
         }
         .center {
           position: relative;
-          text-align: center;
           z-index: 1;
+          text-align: center;
           padding: 40px 16px;
         }
         h1 {
-          margin: 0 0 8px;
+          margin: 0 0 10px;
           font-size: clamp(32px, 5vw, 56px);
           font-weight: 900;
           color: #fff;
+          text-shadow: 0 2px 6px rgba(0,0,0,.35);
         }
         p {
+          margin: 0 0 24px;
           color: #dbeafe;
-          margin-bottom: 24px;
           font-weight: 500;
         }
         .ctaRow {
@@ -78,34 +78,34 @@ export default function HomePage() {
           justify-content: center;
         }
 
-        /* Buttons */
+        /* === Buttons (match your screenshot) === */
         .btnPrimary,
         .btnOutline {
-          border-radius: 12px;
-          padding: 12px 20px;
-          font-weight: 800;
+          border-radius: 14px;
+          padding: 14px 22px;
+          font-weight: 900;
+          letter-spacing: .2px;
           text-decoration: none;
-          transition: all 0.15s ease;
+          transition: all .15s ease;
         }
         .btnPrimary {
           background: #2563eb;
           color: #fff;
           border: 1px solid #1e40af;
+          box-shadow: 0 8px 24px rgba(37,99,235,.35);
         }
-        .btnPrimary:hover {
-          background: #1e40af;
-        }
+        .btnPrimary:hover { background: #1e40af; }
+
         .btnOutline {
-          border: 2px solid #fff;
-          color: #fff;
           background: transparent;
+          color: #fff;
+          border: 3px solid #ffffff;  /* thicker white border so it pops */
+          box-shadow: 0 8px 24px rgba(0,0,0,.35);
         }
-        .btnOutline:hover {
-          background: rgba(255, 255, 255, 0.1);
-        }
+        .btnOutline:hover { background: rgba(255,255,255,.08); }
+
         @media (max-width: 480px) {
-          .btnPrimary,
-          .btnOutline {
+          .btnPrimary, .btnOutline {
             width: 100%;
             text-align: center;
           }
