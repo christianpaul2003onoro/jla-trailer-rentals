@@ -1,175 +1,147 @@
 // components/Nav.tsx
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
 
 export default function Nav() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // Close drawer on route changes / Esc
+  // Close mobile menu on route change
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    const done = () => setOpen(false);
+    router.events.on("routeChangeComplete", done);
+    return () => router.events.off("routeChangeComplete", done);
+  }, [router.events]);
 
   return (
-    <header className="nav">
-      <div className="inner">
-        {/* Left: Logo + Brand (perfectly centered vertically) */}
+    <>
+      <nav className="nav">
         <Link href="/" className="brand">
-          <span className="logoWrap">
-            <Image
-              src="/logo.png"
-              alt="JLA Trailer Rentals"
-              width={36}
-              height={36}
-              className="logo"
-              priority
-            />
-          </span>
+          {/* Round logo */}
+          <img src="/logo.png" alt="JLA Trailer Rentals" className="logo" />
           <span className="brandText">JLA Trailer Rentals</span>
         </Link>
 
-        {/* Desktop menu */}
-        <nav className="links">
+        {/* Desktop links */}
+        <div className="links">
           <Link href="/fleet" className="link">Our Fleet</Link>
           <Link href="/book" className="link">Book</Link>
           <Link href="/find" className="link">Find My Rental</Link>
-        </nav>
+        </div>
 
         {/* Mobile hamburger */}
         <button
-          className="burger"
-          aria-label="Open menu"
+          className="hamburger"
+          aria-label="Menu"
           onClick={() => setOpen((v) => !v)}
         >
-          <span className="bar" />
-          <span className="bar" />
-          <span className="bar" />
+          <span />
+          <span />
+          <span />
         </button>
-      </div>
+      </nav>
 
       {/* Mobile drawer */}
-      <div className={`drawer ${open ? "open" : ""}`}>
-        <Link href="/fleet" className="drawerLink" onClick={() => setOpen(false)}>
-          Our Fleet
-        </Link>
-        <Link href="/book" className="drawerLink" onClick={() => setOpen(false)}>
-          Book
-        </Link>
-        <Link href="/find" className="drawerLink" onClick={() => setOpen(false)}>
-          Find My Rental
-        </Link>
-      </div>
+      {open && (
+        <div className="drawer">
+          <Link href="/fleet" className="drawerLink">Our Fleet</Link>
+          <Link href="/book" className="drawerLink">Book</Link>
+          <Link href="/find" className="drawerLink">Find My Rental</Link>
+        </div>
+      )}
 
       <style jsx>{`
+        :global(body) {
+          margin: 0;
+        }
         .nav {
           position: sticky;
           top: 0;
           z-index: 50;
-          background: #0a0f1a; /* same dark as site */
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .inner {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 10px 16px;            /* a bit taller */
           display: flex;
-          align-items: center;           /* centers brand with logo vertically */
+          align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 16px;
+          padding: 10px 16px;
+          background: rgba(7, 12, 24, 0.96);
+          border-bottom: 1px solid #0f1a2e;
+          backdrop-filter: saturate(140%) blur(6px);
         }
-
         .brand {
           display: inline-flex;
-          align-items: center;           /* <- perfect vertical center with logo */
+          align-items: center;           /* vertical center with logo */
           gap: 10px;
           text-decoration: none;
         }
-        .logoWrap {
+        .logo {
           width: 36px;
           height: 36px;
-          display: grid;
-          place-items: center;
-          border-radius: 999px;
-          background: #0f172a;
-          outline: 1px solid rgba(255,255,255,0.15);
-        }
-        .logo {
           object-fit: cover;
-          border-radius: 999px;
+          border-radius: 9999px;         /* circle */
+          border: 2px solid rgba(255,255,255,0.2);
+          background: #0b1220;
         }
         .brandText {
           color: #ffffff;
           font-weight: 800;
           letter-spacing: 0.2px;
-          line-height: 1;                /* keeps it centered relative to logo */
-          font-size: 18px;
+          line-height: 1;                /* tight so it sits centered */
         }
-
         .links {
           display: none;
-          gap: 22px;
-          align-items: center;
+          gap: 20px;
         }
         .link {
-          color: #ffffff;                 /* ALWAYS white */
+          color: #ffffff;                /* all white, no blues */
           text-decoration: none;
           font-weight: 600;
-          padding: 6px 10px;
-          border-radius: 6px;
-          transition: color .15s ease, background .15s ease;
+          opacity: 0.9;
         }
-        .link:hover {
-          background: rgba(255,255,255,0.08);
-        }
+        .link:hover { opacity: 1; }
 
-        .burger {
-          display: inline-grid;
-          gap: 4px;
-          width: 44px;
-          height: 44px;
+        .hamburger {
+          display: inline-flex;
+          flex-direction: column;
+          gap: 5px;
+          background: transparent;
+          border: 1px solid rgba(255,255,255,0.18);
           border-radius: 10px;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.14);
-          place-items: center;
+          padding: 10px;
         }
-        .burger .bar {
-          width: 18px;
+        .hamburger span {
+          display: block;
+          width: 20px;
           height: 2px;
           background: #ffffff;
           border-radius: 2px;
         }
 
         .drawer {
-          display: none;
-        }
-        .drawer.open {
-          display: block;
-          background: #0a0f1a;
-          border-top: 1px solid rgba(255,255,255,0.06);
+          position: sticky;
+          top: 56px;                     /* height of nav approx */
+          z-index: 40;
+          background: rgba(7, 12, 24, 0.98);
+          border-bottom: 1px solid #0f1a2e;
+          padding: 10px 16px 12px;
+          display: grid;
+          gap: 10px;
         }
         .drawerLink {
-          display: block;
-          color: #ffffff;                /* WHITE, not blue */
+          color: #ffffff;                /* white in mobile menu */
           text-decoration: none;
-          font-weight: 600;
-          padding: 14px 20px;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .drawerLink:hover {
-          background: rgba(255,255,255,0.06);
+          font-weight: 700;
+          font-size: 18px;
         }
 
         /* Desktop breakpoint */
         @media (min-width: 900px) {
-          .brandText { font-size: 19px; }
-          .links { display: flex; }
-          .burger { display: none; }
-          .drawer { display: none !important; }
+          .links { display: inline-flex; }
+          .hamburger { display: none; }
+          .drawer { display: none; }
+          .brandText { font-size: 18px; }
         }
       `}</style>
-    </header>
+    </>
   );
 }
