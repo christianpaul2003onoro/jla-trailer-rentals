@@ -36,11 +36,8 @@ export default function FindMyRental() {
         body: JSON.stringify({ rental, key }),
       });
       const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        setError(json?.error || "Lookup failed.");
-      } else {
-        setResult(json.booking as Booking);
-      }
+      if (!resp.ok || !json.ok) setError(json?.error || "Lookup failed.");
+      else setResult(json.booking as Booking);
     } catch (err: any) {
       setError(err?.message || "Network error.");
     } finally {
@@ -62,25 +59,50 @@ export default function FindMyRental() {
       <Head><title>Find My Rental • JLA Trailer Rentals</title></Head>
       <Nav />
 
-      <main style={{ maxWidth: 900, margin: "32px auto", padding: "0 16px" }}>
-        <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 12, color: "#e5e7eb" }}>
+      {/* Centered section */}
+      <main
+        style={{
+          maxWidth: 600,
+          margin: "60px auto",
+          padding: "0 16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
+        <h1 style={{ fontSize: 34, fontWeight: 800, marginBottom: 10, color: "#e5e7eb" }}>
           Find My Rental
         </h1>
-        <p style={{ color: "#cbd5e1", marginBottom: 16 }}>
+        <p style={{ color: "#cbd5e1", marginBottom: 24 }}>
           Enter your <strong>Rental ID</strong> and <strong>Access Key</strong> (from your confirmation).
         </p>
 
-        <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, maxWidth: 520 }}>
-          <label style={{ display: "grid", gap: 6 }}>
+        <form
+          onSubmit={onSubmit}
+          style={{ display: "grid", gap: 12, width: "100%", maxWidth: 420 }}
+        >
+          <label style={{ display: "grid", gap: 6, textAlign: "left" }}>
             <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Rental ID</span>
-            <input value={rental} onChange={(e) => setRental(e.target.value)} placeholder="JLA-123456" style={inputStyle} />
-          </label>
-          <label style={{ display: "grid", gap: 6 }}>
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Access Key</span>
-            <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="6-digit code" style={inputStyle} />
+            <input
+              value={rental}
+              onChange={(e) => setRental(e.target.value)}
+              placeholder="JLA-123456"
+              style={inputStyle}
+            />
           </label>
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <label style={{ display: "grid", gap: 6, textAlign: "left" }}>
+            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Access Key</span>
+            <input
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder="6-digit code"
+              style={inputStyle}
+            />
+          </label>
+
+          <div style={{ display: "flex", justifyContent: "center", gap: 10, marginTop: 6 }}>
             <button
               type="submit"
               disabled={loading}
@@ -97,33 +119,48 @@ export default function FindMyRental() {
             >
               {loading ? "Checking..." : "View Booking"}
             </button>
-            <Link href="/fleet" style={{ border: "1px solid #334155", padding: "10px 14px", borderRadius: 8, color: "#e5e7eb" }}>
+
+            <Link
+              href="/fleet"
+              style={{
+                border: "1px solid #334155",
+                padding: "10px 14px",
+                borderRadius: 8,
+                color: "#e5e7eb",
+              }}
+            >
               Back to Fleet
             </Link>
           </div>
 
-          {error && <div style={{ color: "#fca5a5" }}>{error}</div>}
+          {error && <div style={{ color: "#fca5a5", marginTop: 8 }}>{error}</div>}
         </form>
 
-        {/* Result card */}
         {result && (
           <div
             style={{
-              marginTop: 18,
+              marginTop: 26,
               background: "#0b1220",
               border: "1px solid #1f2937",
               borderRadius: 10,
-              padding: 16,
-              color: "#cbd5e1",
+              padding: 20,
+              width: "100%",
+              textAlign: "left",
             }}
           >
-            <div style={{ color: "#e5e7eb", fontWeight: 700, marginBottom: 8 }}>
+            <div style={{ color: "#e5e7eb", fontWeight: 700, marginBottom: 6 }}>
               Booking {result.rental_id} — {result.status}
             </div>
-            <div>Trailer: <strong>{result.trailer.name}</strong></div>
-            <div>Dates: <strong>{result.start_date}</strong> to <strong>{result.end_date}</strong></div>
-            <div>Pickup Time: {result.pickup_time || "—"} | Return Time: {result.return_time || "—"}</div>
-            <div>Delivery requested: {result.delivery_requested ? "Yes" : "No"}</div>
+            <div style={{ color: "#cbd5e1" }}>Trailer: <strong>{result.trailer.name}</strong></div>
+            <div style={{ color: "#cbd5e1" }}>
+              Dates: {result.start_date} → {result.end_date}
+            </div>
+            <div style={{ color: "#cbd5e1" }}>
+              Pickup: {result.pickup_time || "—"} | Return: {result.return_time || "—"}
+            </div>
+            <div style={{ color: "#cbd5e1" }}>
+              Delivery requested: {result.delivery_requested ? "Yes" : "No"}
+            </div>
           </div>
         )}
       </main>
