@@ -188,12 +188,15 @@ export default function BookPage() {
         return;
       }
 
-      // Success → redirect with rid/key from API
+            // Success → redirect with rental + key + name + email (for success page)
       const qs = new URLSearchParams({
-        rid: json.rental_id,
+        rental: json.rental_id,
         key: json.access_key,
+        name: `${firstName} ${lastName}`.trim(),
+        email,
       });
       router.push(`/book/success?${qs.toString()}`);
+
     } catch (err: any) {
       setFormError(err?.message || "Network error. Please try again.");
     }
