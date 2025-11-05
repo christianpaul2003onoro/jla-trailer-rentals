@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/router";
 import { useState } from "react";
 
@@ -7,12 +6,12 @@ export default function Nav() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  // NOTE: Your repo currently has /public/logo.png.png.
-  // If you later rename it to /public/logo.png, just change the src below.
+  // Your repo currently has /public/logo.png.png
+  // If you later rename it to /public/logo.png, just change this one line.
   const logoSrc = "/logo.png.png";
 
   const linkStyle: React.CSSProperties = {
-    color: "#93c5fd",
+    color: "#60a5fa", // sky-400 (closer to your original)
     textDecoration: "none",
     padding: "8px 10px",
     borderRadius: 8,
@@ -30,45 +29,32 @@ export default function Nav() {
     <header className="nav">
       <div className="inner">
         <Link href="/" className="brand" aria-label="Go to homepage">
-          <span className="logoWrap">
-            <Image
+          <span className="logoWrap" aria-hidden="true">
+            {/* Use plain <img> so it always shows, and make the bg white so your black logo is visible */}
+            <img
               src={logoSrc}
-              alt="JLA Trailer Rentals logo"
-              width={34}
-              height={34}
-              priority
-              className="logo"
+              alt=""
+              width={40}
+              height={40}
+              style={{ width: 40, height: 40, objectFit: "contain", display: "block" }}
             />
           </span>
           <span className="brandText">JLA Trailer Rentals</span>
         </Link>
 
         <nav className={`links ${open ? "open" : ""}`}>
-          <Link
-            href="/fleet"
-            style={router.pathname === "/fleet" ? activeStyle : linkStyle}
-          >
+          <Link href="/fleet" style={router.pathname === "/fleet" ? activeStyle : linkStyle}>
             Our Fleet
           </Link>
-          <Link
-            href="/book"
-            style={router.pathname === "/book" ? activeStyle : linkStyle}
-          >
+          <Link href="/book" style={router.pathname === "/book" ? activeStyle : linkStyle}>
             Book
           </Link>
-          <Link
-            href="/find"
-            style={router.pathname === "/find" ? activeStyle : linkStyle}
-          >
+          <Link href="/find" style={router.pathname === "/find" ? activeStyle : linkStyle}>
             Find My Rental
           </Link>
         </nav>
 
-        <button
-          className="menuBtn"
-          aria-label="Toggle menu"
-          onClick={() => setOpen((v) => !v)}
-        >
+        <button className="menuBtn" aria-label="Toggle menu" onClick={() => setOpen((v) => !v)}>
           ☰
         </button>
       </div>
@@ -100,15 +86,12 @@ export default function Nav() {
         }
         .logoWrap {
           display: inline-flex;
+          width: 40px;
+          height: 40px;
           border-radius: 999px;
           overflow: hidden;
-          width: 34px;
-          height: 34px;
-          border: 1px solid #1f2937;
-          background: #0b1220;
-        }
-        .logo {
-          object-fit: cover;
+          border: 1px solid #e5e7eb; /* thin white ring so it pops */
+          background: #ffffff; /* white bg so your black logo is visible */
         }
         .brandText {
           line-height: 1;
