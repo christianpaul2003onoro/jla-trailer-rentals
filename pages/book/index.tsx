@@ -207,12 +207,12 @@ export default function BookPage() {
 
   // ---------- styles ----------
   const inputStyle: React.CSSProperties = {
-    padding: 10,
-    borderRadius: 8,
-    background: "#0b1220",
-    color: "#e5e7eb",
-    border: "1px solid "#1f2937"",
-    colorScheme: "dark",
+  padding: 10,
+  borderRadius: 8,
+  background: "#0b1220",
+  color: "#e5e7eb",
+  border: "1px solid #1f2937",
+  colorScheme: "dark",
   } as React.CSSProperties;
   const todayStr = new Date().toISOString().slice(0, 10);
 
