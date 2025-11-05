@@ -8,9 +8,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 );
 
-type Out =
-  | { ok: true; rental_id: string; access_key: string }
-  | { ok: false; error: string; field?: string };
+type Ok = { ok: true; rental_id: string; access_key: string };
+type Err = { ok: false; error: string; field?: string };
+type Out = Ok | Err;
 
 export default async function handler(
   req: NextApiRequest,
@@ -49,51 +49,79 @@ export default async function handler(
   if (!email?.trim())       return bad("email", "Email required.");
   if (!phone?.trim())       return bad("phone", "Phone required.");
 
-  // ---- Upsert client (by email) ----
-  const { data: clientRow, error: clientErr } = await supabase
-    .from("clients")
-    .upsert(
-      {
-        email: String(email).trim().toLowerCase(),
-        first_name: String(first_name).trim(),
-        last_name: String(last_name).trim(),
-        phone: String(phone).trim(),
-      },
-      { onConflict: "email", ignoreDuplicates: false }
-    )
-    .select("id")
-    .single();
+  const normEmail = String(email).trim().toLowerCase();
+  const normFirst = String(first_name).trim();
+  const normLast  = String(last_name).trim();
+  const normPhone = String(phone).trim();
 
-  if (clientErr || !clientRow) {
-    return res
-      .status(500)
-      .json({ ok: false, error: `Client save failed: ${clientErr?.message || "unknown"}` });
+  // ---- GET or CREATE client (no UPSERT, avoids UNIQUE requirement) ----
+  // 1) Try to find an existing client by email
+  const { data: foundRows, error: selErr } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("email", normEmail)
+    .limit(1);
+
+  if (selErr) {
+    console.error("CLIENT_SELECT_ERROR", selErr);
+    return res.status(500).json({ ok: false, error: "Client lookup failed." });
+  }
+
+  let clientId = foundRows?.[0]?.id as string | undefined;
+
+  // 2) If not found, insert a new client
+  if (!clientId) {
+    const { data: newClient, error: insErr } = await supabase
+      .from("clients")
+      .insert({
+        email: normEmail,
+        first_name: normFirst,
+        last_name: normLast,
+        phone: normPhone,
+      })
+      .select("id")
+      .single();
+
+    if (insErr || !newClient) {
+      console.error("CLIENT_INSERT_ERROR", insErr);
+      return res.status(500).json({
+        ok: false,
+        error: `Client save failed: ${insErr?.message || "unknown"}`,
+      });
+    }
+    clientId = newClient.id;
   }
 
   // ---- Create booking ----
   const access_key = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit
-  // rental_id can be generated in DB (trigger) or here; we'll do it here:
-  const rental_id = "JLA-" + Math.floor(100000 + Math.random() * 900000).toString();
+  const rental_id  = "JLA-" + Math.floor(100000 + Math.random() * 900000).toString();
 
-  const { error: bookErr } = await supabase.from("bookings").insert({
+  const payload = {
     rental_id,
-    client_id: clientRow.id,
+    client_id: clientId,
     trailer_id,
-    start_date,
-    end_date,
+    start_date,                      // ensure your column type is date
+    end_date,                        // ensure your column type is date
     pickup_time: pickup_time ?? null,
     return_time: return_time ?? null,
     delivery_requested: !!delivery_requested,
     towing_vehicle: towing_vehicle ?? null,
     comments: comments ?? null,
     status: "Pending",
-    access_key,
-  });
+    access_key,                      // make sure the column exists (text)
+  };
+
+  const { error: bookErr } = await supabase
+    .from("bookings")
+    .insert(payload);
 
   if (bookErr) {
-    // Typical causes if you see this:
-    // - RLS policy denies insert
-    // - NOT NULL / type mismatch in table
+    console.error("BOOKING_INSERT_ERROR", {
+      message: bookErr.message,
+      details: (bookErr as any).details,
+      hint: (bookErr as any).hint,
+      code: (bookErr as any).code,
+    });
     return res
       .status(500)
       .json({ ok: false, error: `Booking insert failed: ${bookErr.message}` });
