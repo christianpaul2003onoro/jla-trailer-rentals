@@ -1,136 +1,236 @@
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { useState } from "react";
 
 export default function Nav() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const router = useRouter();
 
-  // Updated to use renamed logo file
-  const logoSrc = "/logo.png";
+  // Close mobile menu when route changes
+  useEffect(() => {
+    const handle = () => setOpen(false);
+    router.events.on("routeChangeStart", handle);
+    return () => router.events.off("routeChangeStart", handle);
+  }, [router.events]);
 
   const linkStyle: React.CSSProperties = {
-    color: "#60a5fa", // same blue as before
+    color: "#cbd5e1",
     textDecoration: "none",
-    padding: "8px 10px",
-    borderRadius: 8,
-    border: "1px solid transparent",
     fontWeight: 600,
+    padding: "10px 12px",
+    borderRadius: 8,
+    display: "inline-block",
+    lineHeight: 1,
   };
 
-  const activeStyle: React.CSSProperties = {
-    ...linkStyle,
-    borderColor: "#1e40af",
-    background: "rgba(30, 64, 175, 0.15)",
+  const linkActive: React.CSSProperties = {
+    color: "#93c5fd",
   };
 
   return (
-    <header className="nav">
-      <div className="inner">
-        <Link href="/" className="brand" aria-label="Go to homepage">
-          <div className="logoBox">
-            <img src={logoSrc} alt="JLA Logo" className="logo" />
-          </div>
-          <span className="brandText">JLA Trailer Rentals</span>
+    <header className="nav-root">
+      <div className="nav-wrap">
+        {/* Left: Logo + Brand (Home) */}
+        <Link href="/" className="brand">
+          <img
+            src="/logo.png"
+            alt="JLA Trailer Rentals"
+            className="logo"
+            width={36}
+            height={36}
+          />
+          <span className="brand-text">JLA Trailer Rentals</span>
         </Link>
 
-        <nav className={`links ${open ? "open" : ""}`}>
-          <Link href="/fleet" style={router.pathname === "/fleet" ? activeStyle : linkStyle}>
+        {/* Desktop links */}
+        <nav className="links">
+          <Link
+            href="/fleet"
+            style={{
+              ...linkStyle,
+              ...(router.pathname === "/fleet" ? linkActive : {}),
+            }}
+          >
             Our Fleet
           </Link>
-          <Link href="/book" style={router.pathname === "/book" ? activeStyle : linkStyle}>
+          <Link
+            href="/book"
+            style={{
+              ...linkStyle,
+              ...(router.pathname.startsWith("/book") ? linkActive : {}),
+            }}
+          >
             Book
           </Link>
-          <Link href="/find" style={router.pathname === "/find" ? activeStyle : linkStyle}>
+          <Link
+            href="/find"
+            style={{
+              ...linkStyle,
+              ...(router.pathname === "/find" ? linkActive : {}),
+            }}
+          >
             Find My Rental
           </Link>
         </nav>
 
-        <button className="menuBtn" aria-label="Toggle menu" onClick={() => setOpen((v) => !v)}>
-          ☰
+        {/* Mobile hamburger */}
+        <button
+          className="hamburger"
+          aria-label="Open menu"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span />
+          <span />
+          <span />
         </button>
       </div>
 
+      {/* Mobile dropdown */}
+      {open && (
+        <div className="mobile-menu">
+          <Link href="/fleet" className="m-link">
+            Our Fleet
+          </Link>
+          <Link href="/book" className="m-link">
+            Book
+          </Link>
+          <Link href="/find" className="m-link">
+            Find My Rental
+          </Link>
+        </div>
+      )}
+
       <style jsx>{`
-        .nav {
+        .nav-root {
           position: sticky;
           top: 0;
           z-index: 50;
-          background: rgba(3, 7, 18, 0.9);
-          backdrop-filter: blur(6px);
-          border-bottom: 1px solid #111827;
+          background: rgba(2, 6, 23, 0.9); /* slate-950 w/ opacity */
+          backdrop-filter: saturate(160%) blur(6px);
+          border-bottom: 1px solid #0f172a; /* slate-900 */
         }
-        .inner {
+        .nav-wrap {
           max-width: 1100px;
           margin: 0 auto;
           padding: 10px 16px;
           display: flex;
           align-items: center;
           justify-content: space-between;
+          gap: 12px;
         }
         .brand {
           display: inline-flex;
           align-items: center;
           gap: 10px;
-          color: #e5e7eb;
           text-decoration: none;
-          font-weight: 800;
-        }
-        .logoBox {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 42px;
-          height: 42px;
-          border-radius: 50%;
-          overflow: hidden;
-          border: 1px solid #1f2937;
-          background: white; /* makes your black logo visible */
         }
         .logo {
-          width: 90%;
-          height: auto;
-          object-fit: contain;
+          width: 36px;
+          height: 36px;
+          border-radius: 9999px; /* circular */
+          background: #0b1220;
+          border: 1px solid #1f2937; /* slate-800 */
+          object-fit: cover;
         }
-        .brandText {
-          line-height: 1;
-          display: none;
+        .brand-text {
+          color: #e5e7eb; /* white/soft */
+          font-weight: 800;
+          font-size: 18px;
+          letter-spacing: 0.1px;
+          white-space: nowrap;
         }
+
         .links {
           display: none;
-          gap: 8px;
           align-items: center;
+          gap: 6px;
         }
-        .menuBtn {
-          background: transparent;
+
+        .hamburger {
+          display: inline-flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 4px;
+          width: 40px;
+          height: 40px;
+          border-radius: 8px;
+          border: 1px solid #1f2937;
+          background: #0b1220;
+          cursor: pointer;
+        }
+        .hamburger span {
+          width: 18px;
+          height: 2px;
+          background: #e5e7eb;
+          display: block;
+          border-radius: 2px;
+        }
+
+        .mobile-menu {
+          display: grid;
+          gap: 8px;
+          padding: 10px 16px 14px;
+          border-top: 1px solid #0f172a;
+          background: rgba(2, 6, 23, 0.95);
+        }
+        .m-link {
           color: #e5e7eb;
+          text-decoration: none;
+          font-weight: 600;
+          padding: 10px 12px;
           border: 1px solid #1f2937;
           border-radius: 8px;
-          padding: 6px 10px;
-          font-size: 18px;
-          display: inline-flex;
+          background: #0b1220;
         }
-        @media (min-width: 700px) {
-          .brandText {
-            display: inline-block;
-          }
+        .m-link:hover {
+          color: #93c5fd;
+          border-color: #1e3a8a; /* blue-800 */
+        }
+
+        /* Medium+ screens: show desktop links, keep brand aligned; hide hamburger & mobile menu */
+        @media (min-width: 820px) {
           .links {
             display: inline-flex;
           }
-          .menuBtn {
+          .hamburger {
+            display: none;
+          }
+          .mobile-menu {
             display: none;
           }
         }
-        .links.open {
-          position: absolute;
-          top: 56px;
-          right: 10px;
+
+        /* Very narrow phones: keep brand visible but let it shrink elegantly */
+        @media (max-width: 360px) {
+          .brand-text {
+            font-size: 16px;
+          }
+        }
+
+        /* Landscape phone fix: ensure brand sits nicely with logo */
+        @media (max-height: 420px) and (orientation: landscape) {
+          .brand-text {
+            font-size: 16px;
+          }
+          .logo {
+            width: 32px;
+            height: 32px;
+          }
+          .nav-wrap {
+            padding-top: 6px;
+            padding-bottom: 6px;
+          }
+        }
+
+        /* Hover states for desktop links */
+        :global(a:hover) {
+          /* keep other links behavior intact; scoped hover is on inline style above */
+        }
+        .links :global(a:hover) {
+          color: #93c5fd !important; /* blue-300 */
           background: #0b1220;
-          border: 1px solid #1f2937;
-          border-radius: 10px;
-          padding: 8px;
-          display: grid;
-          gap: 6px;
+          border: 1px solid #1e3a8a; /* blue-800 */
         }
       `}</style>
     </header>
