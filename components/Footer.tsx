@@ -3,51 +3,81 @@ export default function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-neutral-800 mt-16">
-      <div className="container mx-auto px-4 py-8 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        {/* Left: address + contact */}
-        <div className="text-sm text-neutral-400 space-y-1 text-center md:text-left">
-          <div>11500 SW 47th St, Miami, FL 33165</div>
-          <div>
-            <a href="tel:+17867606175" className="hover:underline">(786) 760-6175</a>
-          </div>
-          <div>
-            <a
-              href="mailto:JLAtrailerrental@gmail.com"
-              className="hover:underline"
-            >
-              JLAtrailerrental@gmail.com
-            </a>
-          </div>
-          <div className="text-neutral-500">© {year} JLA Trailer Rentals</div>
-        </div>
+    <footer style={{ borderTop: "1px solid #1f2937", marginTop: 48 }}>
+      <div
+        style={{
+          maxWidth: 1100,
+          margin: "0 auto",
+          padding: "20px 16px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 10,
+          textAlign: "center",
+          color: "#cbd5e1",
+        }}
+      >
+        {/* Address */}
+        <div>11500 SW 47th St, Miami, FL 33165</div>
 
-        {/* Right: Instagram */}
-        <div className="flex items-center justify-center md:justify-end">
+        {/* Contact row */}
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            flexWrap: "wrap",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <a href="tel:+17867606175" style={{ color: "#93c5fd" }}>
+            (786) 760-6175
+          </a>
+
+          <a
+            href="mailto:JLAtrailerrental@gmail.com"
+            style={{ color: "#93c5fd" }}
+          >
+            JLAtrailerrental@gmail.com
+          </a>
+
+          {/* IG: icon + handle are both clickable */}
           <a
             href="https://instagram.com/jlatrailerrentals"
             target="_blank"
-            rel="noopener"
-            aria-label="JLA Trailer Rentals on Instagram"
-            className="group inline-flex items-center gap-2 rounded-xl border border-neutral-700 px-3 py-2 hover:border-neutral-500 hover:bg-neutral-800/40"
+            rel="noopener noreferrer"
+            aria-label="Instagram @jlatrailerrentals"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              color: "#93c5fd",
+              textDecoration: "none",
+            }}
           >
-            {/* Instagram glyph (inline SVG, no extra deps) */}
+            {/* Minimal Instagram glyph (uses currentColor) */}
             <svg
-              width="22" height="22" viewBox="0 0 24 24"
-              fill="none" xmlns="http://www.w3.org/2000/svg"
-              className="shrink-0"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ display: "block" }}
             >
-              <rect x="2" y="2" width="20" height="20" rx="5"
-                    stroke="currentColor" className="text-neutral-400 group-hover:text-neutral-200" />
-              <circle cx="12" cy="12" r="4"
-                      stroke="currentColor" className="text-neutral-400 group-hover:text-neutral-200" />
-              <circle cx="17.5" cy="6.5" r="1.25"
-                      fill="currentColor" className="text-neutral-400 group-hover:text-neutral-200" />
+              <rect x="3" y="3" width="18" height="18" rx="5" />
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
             </svg>
-            <span className="text-sm font-medium text-neutral-300 group-hover:text-neutral-100">
-              @jlatrailerrentals
-            </span>
+            <span>@jlatrailerrentals</span>
           </a>
+        </div>
+
+        {/* Copyright */}
+        <div style={{ fontSize: 12, color: "#94a3b8" }}>
+          © {year} JLA Trailer Rentals
         </div>
       </div>
     </footer>
