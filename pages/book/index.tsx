@@ -1,6 +1,6 @@
 // pages/book/index.tsx
-// Booking form with live availability check using /api/availability
-// Uses only relative imports (no "@/"), and posts exact keys your /api/book expects.
+// Booking form with live availability check using /api/availability.
+// Uses only relative imports.
 
 import Head from "next/head";
 import Link from "next/link";
@@ -157,7 +157,6 @@ export default function BookPage() {
     setFormError(null);
     if (!validate()) return;
 
-    // Payload uses EXACT keys your /api/book expects.
     const payload = {
       trailer_id: trailerId,
       start_date: startDate,
@@ -187,7 +186,7 @@ export default function BookPage() {
         return;
       }
 
-      // Success → redirect with rental + key + name + email, save for refresh
+      // Success → redirect with rental + key + name + email, and save for refresh
       const payloadForSuccess = {
         rental: json.rental_id,
         key: json.access_key,
@@ -195,20 +194,16 @@ export default function BookPage() {
         email,
       };
 
-      // Persist in both storages (covers refresh / router timing)
       try {
+        const s = JSON.stringify(payloadForSuccess);
         if (typeof window !== "undefined") {
-          const s = JSON.stringify(payloadForSuccess);
           sessionStorage.setItem("jla_last_rental", s);
           localStorage.setItem("jla_last_rental", s);
         }
       } catch {}
 
       const qs = new URLSearchParams(payloadForSuccess);
-
-      // Hard navigation to preserve full query reliably
       if (typeof window !== "undefined") {
-        console.log("Booking → Success params:", Object.fromEntries(qs.entries()));
         window.location.assign(`/book/success?${qs.toString()}`);
       } else {
         router.push(`/book/success?${qs.toString()}`);
@@ -240,8 +235,8 @@ export default function BookPage() {
           Book a Trailer
         </h1>
         <p style={{ color: "#cbd5e1", marginBottom: 22 }}>
-          Choose a trailer, pick your dates, and fill your info. We’ll confirm by email. Delivery available —{" "}
-          <strong>$2.50/mile traveled</strong> (estimate provided after billing).
+          Choose a trailer, pick your dates, and fill your info. We’ll confirm by email.
+          Delivery available — <strong>$2.50/mile traveled</strong> (estimate provided after billing).
         </p>
 
         <form onSubmit={onSubmit} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
@@ -273,16 +268,14 @@ export default function BookPage() {
             {/* Availability banner */}
             <div style={{ gridColumn: "1 / span 2" }}>
               {checkingAvail && <div style={{ color: "#93c5fd" }}>Checking availability…</div>}
-
               {!checkingAvail && isAvailable === true && startDate && endDate && (
                 <div style={{ color: "#86efac" }}>✅ Those dates are available.</div>
               )}
-
               {!checkingAvail && isAvailable === false && (
                 <div
                   style={{
                     color: "#fecaca",
-                    background: "#7f1d1d",
+                    background: "#0b1220",
                     border: "1px solid #ef4444",
                     borderRadius: 8,
                     padding: "8px 10px",
@@ -317,7 +310,7 @@ export default function BookPage() {
             </label>
           </div>
 
-          {/* Delivery (info only) */}
+          {/* Delivery */}
           <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <input type="checkbox" checked={delivery} onChange={(e) => setDelivery(e.target.checked)} />
             <span style={{ color: "#e5e7eb" }}>
