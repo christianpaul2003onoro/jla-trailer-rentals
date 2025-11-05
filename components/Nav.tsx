@@ -1,107 +1,197 @@
 // components/Nav.tsx
 import Link from "next/link";
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const close = () => setOpen(false);
-    window.addEventListener("resize", close);
-    window.addEventListener("orientationchange", close);
-    return () => {
-      window.removeEventListener("resize", close);
-      window.removeEventListener("orientationchange", close);
-    };
-  }, []);
+    router.events.on("routeChangeStart", close);
+    return () => router.events.off("routeChangeStart", close);
+  }, [router.events]);
+
+  const linkBase: React.CSSProperties = {
+    color: "#ffffff", // white
+    textDecoration: "none",
+    fontWeight: 700,
+    padding: "10px 12px",
+    borderRadius: 8,
+    display: "inline-flex",
+    alignItems: "center",
+    lineHeight: 1,
+  };
+
+  const linkActive: React.CSSProperties = { color: "#93c5fd" };
 
   return (
-    <> {/* ⬅️ OPEN fragment */}
-      <header className="nav">
-        <Link href="/" className="brandLeft" aria-label="Home">
-          <span className="logoWrap">
-            <Image src="/logo.png" alt="JLA logo" width={28} height={28} priority />
-          </span>
+    <header className="nav-root">
+      <div className="nav-wrap">
+        {/* Brand (Logo + Title) */}
+        <Link href="/" className="brand" aria-label="Home">
+          <img src="/logo.png" alt="JLA Trailer Rentals logo" className="logo" />
+          <span className="brand-text">JLA Trailer Rentals</span>
         </Link>
 
-        <Link href="/" className="brandCenter">JLA Trailer Rentals</Link>
-
+        {/* Desktop links */}
         <nav className="links">
-          <Link href="/fleet" className="navLink">Our Fleet</Link>
-          <Link href="/book" className="navLink">Book</Link>
-          <Link href="/find" className="navLink">Find My Rental</Link>
+          <Link href="/fleet" style={{ ...linkBase, ...(router.pathname === "/fleet" ? linkActive : {}) }}>
+            Our Fleet
+          </Link>
+          <Link href="/book" style={{ ...linkBase, ...(router.pathname.startsWith("/book") ? linkActive : {}) }}>
+            Book
+          </Link>
+          <Link href="/find" style={{ ...linkBase, ...(router.pathname === "/find" ? linkActive : {}) }}>
+            Find My Rental
+          </Link>
         </nav>
 
+        {/* Hamburger */}
         <button
           className="hamburger"
-          onClick={() => setOpen(v => !v)}
-          aria-label="Open menu"
-          aria-expanded={open ? "true" : "false"}
+          aria-label="Menu"
+          onClick={() => setOpen((v) => !v)}
         >
-          <span className="bar" /><span className="bar" /><span className="bar" />
+          <span></span>
+          <span></span>
+          <span></span>
         </button>
-      </header>
+      </div>
 
+      {/* Mobile Drawer */}
       {open && (
-        <div className="drawer">
-          <Link href="/fleet" className="drawerLink" onClick={() => setOpen(false)}>Our Fleet</Link>
-          <Link href="/book"  className="drawerLink" onClick={() => setOpen(false)}>Book</Link>
-          <Link href="/find"  className="drawerLink" onClick={() => setOpen(false)}>Find My Rental</Link>
+        <div className="mobile-menu">
+          <Link href="/fleet" className="m-link" onClick={() => setOpen(false)}>
+            Our Fleet
+          </Link>
+          <Link href="/book" className="m-link" onClick={() => setOpen(false)}>
+            Book
+          </Link>
+          <Link href="/find" className="m-link" onClick={() => setOpen(false)}>
+            Find My Rental
+          </Link>
         </div>
       )}
 
       <style jsx>{`
-  .nav {
-    /* was: position: sticky; top:0;  --> remove to make it non-sticky */
-    position: relative;                 /* scrolls with page */
-    z-index: 50;
-    display: grid;
-    grid-template-columns: 48px 1fr auto;
-    align-items: center;
-    gap: 12px;
-    height: 64px;
-    padding: 0 14px;
+        .nav-root {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: rgba(2, 6, 23, 0.9);
+          backdrop-filter: saturate(160%) blur(6px);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-    /* lighter, more transparent so the photo shows through */
-    background: rgba(10, 16, 28, 0.50); /* ↓ adjust 0.50 → 0.40 if you want even lighter */
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    backdrop-filter: blur(6px);
-  }
+        .nav-wrap {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 10px 16px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
 
-  .logoWrap { width:36px; height:36px; display:grid; place-items:center; background:#0b1220; border-radius:999px; overflow:hidden; }
+        .brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          text-decoration: none;
+        }
 
-  /* keep ALL links white in all states */
-  .nav :where(a, a:link, a:visited, a:hover, a:active) {
-    color:#ffffff !important;
-    text-decoration:none;
-  }
+        .logo {
+          width: 36px;
+          height: 36px;
+          border-radius: 9999px;
+          object-fit: cover;
+          background: #0b1220;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
 
-  .brandCenter { justify-self:center; font-weight:800; font-size:18px; letter-spacing:.2px; }
+        .brand-text {
+          color: #ffffff; /* White */
+          font-weight: 800;
+          font-size: 18px;
+          letter-spacing: 0.1px;
+          line-height: 1;
+          transform: translateY(1px);
+          white-space: nowrap;
+        }
 
-  .links { display:flex; align-items:center; gap:18px; }
-  .navLink { font-weight:700; }
-  .navLink:hover { color:#e6f0ff !important; }
+        .links {
+          display: none;
+          align-items: center;
+          gap: 10px;
+        }
 
-  .hamburger { display:none; width:44px; height:44px; border:1px solid rgba(255,255,255,.15); border-radius:10px; background:transparent; }
-  .bar { width:20px; height:2px; background:#fff; border-radius:2px; }
+        .hamburger {
+          display: inline-flex;
+          flex-direction: column;
+          gap: 4px;
+          width: 40px;
+          height: 40px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          background: transparent;
+          cursor: pointer;
+          align-items: center;
+          justify-content: center;
+        }
 
-  .drawer { display:none; }
+        .hamburger span {
+          width: 18px;
+          height: 2px;
+          background: #ffffff;
+          border-radius: 2px;
+        }
 
-  @media (max-width:768px) and (orientation:portrait) {
-    .links { display:none; }
-    .hamburger { display:flex; flex-direction:column; justify-content:center; gap:4px; }
-    .drawer {
-      display:grid; gap:14px; padding:16px;
-      background:rgba(10,16,28,.90);
-      border-bottom:1px solid rgba(255,255,255,.06);
-    }
-    .drawer :where(a, a:link, a:visited, a:hover, a:active) {
-      color:#ffffff !important; font-weight:700; font-size:17px; text-decoration:none;
-    }
-  }
-`}</style>
+        .mobile-menu {
+          display: grid;
+          gap: 4px;
+          padding: 10px 16px 14px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(2, 6, 23, 0.98);
+        }
 
-    </>  /* ⬅️ CLOSE fragment — prevents the compile error */
+        .m-link {
+          display: block;
+          text-decoration: none !important;
+          color: #ffffff !important;
+          font-weight: 700;
+          padding: 12px 6px;
+        }
+
+        .m-link:hover {
+          color: #93c5fd !important;
+        }
+
+        @media (min-width: 820px) {
+          .links {
+            display: inline-flex;
+          }
+          .hamburger,
+          .mobile-menu {
+            display: none;
+          }
+        }
+
+        @media (max-height: 420px) and (orientation: landscape) {
+          .brand-text {
+            font-size: 16px;
+          }
+          .logo {
+            width: 32px;
+            height: 32px;
+          }
+          .nav-wrap {
+            padding-top: 6px;
+            padding-bottom: 6px;
+          }
+        }
+      `}</style>
+    </header>
   );
 }
