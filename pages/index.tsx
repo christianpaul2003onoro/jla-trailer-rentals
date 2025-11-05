@@ -15,143 +15,133 @@ export default function Home() {
         />
       </Head>
 
-      <Nav />
+      <div className="page">
+        <Nav />
 
-      <main
-        style={{
-          position: "relative",
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          overflow: "hidden",
-          backgroundColor: "#0b1220",
-        }}
-      >
-        {/* Background image */}
-        <img
-          src="/home_page_background_wallpaper.png"
-          alt="Pickup truck towing a car on a trailer at sunset"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            zIndex: 0,
-          }}
-        />
+        {/* --- HERO SECTION --- */}
+        <main className="hero">
+          <div className="content">
+            <h1>JLA Trailer Rentals</h1>
+            <p>Reliable trailers. Simple bookings. Local pickup in Miami.</p>
 
-        {/* Dark overlay for readability */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to bottom, rgba(2,6,23,0.25), rgba(2,6,23,0.55))",
-            zIndex: 1,
-          }}
-        />
-
-        {/* Hero content */}
-        <div style={{ zIndex: 2, padding: "0 16px", width: "100%" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <h1
-              style={{
-                fontSize: "42px",
-                fontWeight: 800,
-                color: "#ffffff",
-                marginBottom: 10,
-              }}
-            >
-              JLA Trailer Rentals
-            </h1>
-
-            <p
-              style={{
-                color: "#cbd5e1",
-                fontSize: 18,
-                marginBottom: 24,
-                fontWeight: 400,
-              }}
-            >
-              Reliable trailers. Simple bookings. Local pickup in Miami.
-            </p>
-
-            {/* Buttons */}
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                justifyContent: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              {/* Primary */}
-              <Link
-                href="/book"
-                className="heroPrimaryBtn"
-                style={{
-                  background: "#2563eb",
-                  border: "1px solid #1e40af",
-                  color: "#ffffff",
-                  padding: "12px 18px",
-                  borderRadius: 10,
-                  fontWeight: 800,
-                  textDecoration: "none",
-                  fontSize: 16,
-                }}
-              >
+            <div className="buttons">
+              <Link href="/book" className="primary">
                 Book a Trailer Rental
               </Link>
-
-              {/* Secondary (white border look) */}
-              <Link
-                href="/find"
-                className="heroSecondaryBtn"
-                style={{
-                  background: "rgba(2,6,23,0.55)",
-                  border: "2px solid #ffffff",
-                  color: "#ffffff",
-                  padding: "12px 18px",
-                  borderRadius: 10,
-                  fontWeight: 800,
-                  textDecoration: "none",
-                  fontSize: 16,
-                }}
-              >
+              <Link href="/find" className="secondary">
                 Find My Rental
               </Link>
             </div>
           </div>
+        </main>
 
-          {/* Small hover + mobile tweaks */}
-          <style jsx>{`
-            .heroPrimaryBtn:hover {
-              opacity: 0.96;
-            }
-            .heroSecondaryBtn:hover {
-              border-color: #e5e7eb;
-              background: rgba(2, 6, 23, 0.65);
-            }
-            @media (max-width: 480px) {
-              h1 {
-                font-size: 34px !important;
-              }
-              .heroPrimaryBtn,
-              .heroSecondaryBtn {
-                padding: 11px 16px !important;
-                font-weight: 800 !important;
-                font-size: 15px !important;
-              }
-            }
-          `}</style>
-        </div>
-      </main>
+        <Footer />
+      </div>
 
-      <Footer />
+      <style jsx>{`
+        .page {
+          position: relative;
+          min-height: 100vh;
+          overflow: hidden;
+          background-color: #0b1220;
+          background-image: url("/home_page_background_wallpaper.png");
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+
+        /* Overlay for better text readability */
+        .page::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.45);
+          z-index: 0;
+        }
+
+        .hero {
+          position: relative;
+          z-index: 1;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          padding: 0 16px;
+        }
+
+        .content {
+          max-width: 900px;
+          margin: 0 auto;
+        }
+
+        h1 {
+          font-size: 42px;
+          font-weight: 800;
+          color: #ffffff;
+          margin-bottom: 10px;
+        }
+
+        p {
+          color: #cbd5e1;
+          font-size: 18px;
+          margin-bottom: 24px;
+        }
+
+        .buttons {
+          display: flex;
+          gap: 12px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .primary {
+          background: #2563eb;
+          border: 1px solid #1e40af;
+          color: #ffffff;
+          padding: 12px 18px;
+          border-radius: 10px;
+          font-weight: 800;
+          text-decoration: none;
+          font-size: 16px;
+        }
+
+        .secondary {
+          background: rgba(2, 6, 23, 0.55);
+          border: 2px solid #ffffff;
+          color: #ffffff;
+          padding: 12px 18px;
+          border-radius: 10px;
+          font-weight: 800;
+          text-decoration: none;
+          font-size: 16px;
+        }
+
+        .primary:hover {
+          opacity: 0.95;
+        }
+
+        .secondary:hover {
+          background: rgba(2, 6, 23, 0.65);
+          border-color: #e5e7eb;
+        }
+
+        @media (max-width: 480px) {
+          h1 {
+            font-size: 34px;
+          }
+          .primary,
+          .secondary {
+            padding: 11px 16px;
+            font-size: 15px;
+            font-weight: 800;
+          }
+        }
+      `}</style>
     </>
   );
 }
