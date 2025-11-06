@@ -41,15 +41,25 @@ export default function AdminHome() {
   const [approveFor, setApproveFor] = useState<null | Row>(null);
 
   async function refreshRows() {
+    setLoading(true);
     try {
-      setLoading(true);
-      const resp = await fetch("/api/admin/bookings");
+      const resp = await fetch("/api/admin/bookings", { credentials: "include" });
       if (resp.status === 401) {
         window.location.href = "/admin/login";
         return;
       }
       const json = await resp.json();
-      setRows(json?.rows ?? []);
+      if (!resp.ok || json?.ok === false) {
+        console.error("Bookings load failed:", json);
+        alert(json?.error || "Failed to load bookings.");
+        setRows([]);
+      } else {
+        setRows(json?.rows ?? []);
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Network error while loading bookings.");
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -71,11 +81,18 @@ export default function AdminHome() {
     const resp = await fetch(`/api/admin/bookings/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(body),
     });
+
+    if (resp.status === 401) {
+      window.location.href = "/admin/login";
+      return false;
+    }
+
     const json = await resp.json();
 
-    if (!json?.ok) {
+    if (!resp.ok || json?.ok === false) {
       alert(json?.error || "Could not update status.");
       return false;
     }
@@ -83,16 +100,16 @@ export default function AdminHome() {
     // If API returned a full joined row, merge it safely so nested objects don't flicker to "—"
     if (json?.row) {
       setRows((prev) =>
-        prev.map((r) => {
-          if (r.id !== id) return r;
-          const updated = json.row as Row;
-          return {
-            ...r,
-            ...updated,
-            clients: updated.clients ?? r.clients,
-            trailers: updated.trailers ?? r.trailers,
-          };
-        })
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                ...json.row,
+                clients: json.row.clients ?? r.clients,
+                trailers: json.row.trailers ?? r.trailers,
+              }
+            : r
+        )
       );
       return true;
     }
