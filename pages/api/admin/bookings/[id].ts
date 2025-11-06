@@ -17,74 +17,88 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   if (!id) return res.status(400).json({ ok: false, error: "Missing id" });
 
   const {
-    status,
-    mark_paid,
-    close_outcome,        // "completed" | "cancelled"
-    close_reason,
-    reschedule_notify_only
-  } = req.body || {};
+    status,                   // "Approved" | "Paid" | "Closed" | ...
+    mark_paid,                // boolean
+    close_outcome,            // "completed" | "cancelled"
+    close_reason,             // string | null
+    reschedule_notify_only,   // boolean
+  } = (req.body ?? {}) as Record<string, any>;
 
-  // helper: write an event (ignore failure)
-  async function logEvent(kind: string, details: Record<string, any>) {
-    await supabaseAdmin.from("booking_events").insert({ booking_id: id, kind, details }).then(() => {}, () => {});
+  // -------- helpers --------
+  async function logEvent(kind: string, details: Record<string, any> = {}) {
+    await supabaseAdmin
+      .from("booking_events")
+      .insert({ booking_id: id, kind, details })
+      .then(() => {}, () => {});
   }
 
-  if (mark_paid) {
-    const { data, error } = await supabaseAdmin
+  async function fetchFullRow() {
+    return supabaseAdmin
       .from("bookings")
-      .update({ status: "Paid" })
+      .select(
+        `
+        id, rental_id, status, start_date, end_date, delivery_requested,
+        created_at, paid_at, approved_at, payment_link, payment_link_sent_at,
+        close_outcome, close_reason,
+        trailers:trailers ( name ),
+        clients:clients ( first_name, last_name, email )
+      `
+      )
       .eq("id", id)
-      .select("*")
       .single();
+  }
+
+  async function finishAndReturn() {
+    const { data: row, error } = await fetchFullRow();
+    if (error || !row) return res.status(500).json({ ok: false, error: error?.message || "Fetch failed" });
+    return res.status(200).json({ ok: true, row });
+  }
+
+  // -------- actions --------
+
+  // Mark Paid
+  if (mark_paid) {
+    const patch: any = { status: "Paid", paid_at: new Date().toISOString() };
+    const { error } = await supabaseAdmin.from("bookings").update(patch).eq("id", id);
     if (error) return res.status(500).json({ ok: false, error: error.message });
     await logEvent("mark_paid", {});
-    return res.status(200).json({ ok: true, row: data });
+    return finishAndReturn();
   }
 
+  // Only send an email/notice for reschedule (no DB change)
   if (reschedule_notify_only) {
     await logEvent("reschedule_notify", {});
     return res.status(200).json({ ok: true });
   }
 
+  // Approve
   if (status === "Approved") {
-    const { data, error } = await supabaseAdmin
-      .from("bookings")
-      .update({ status: "Approved" })
-      .eq("id", id)
-      .select("*")
-      .single();
+    const patch: any = { status: "Approved", approved_at: new Date().toISOString() };
+    const { error } = await supabaseAdmin.from("bookings").update(patch).eq("id", id);
     if (error) return res.status(500).json({ ok: false, error: error.message });
     await logEvent("approved", {});
-    return res.status(200).json({ ok: true, row: data });
+    return finishAndReturn();
   }
 
+  // Close (Finished or Cancelled)
   if (status === "Closed") {
     const patch: any = {
       status: "Closed",
       close_outcome: close_outcome === "cancelled" ? "cancelled" : "completed",
       close_reason: close_reason ?? null,
     };
-    const { data, error } = await supabaseAdmin
-      .from("bookings")
-      .update(patch)
-      .eq("id", id)
-      .select("*")
-      .single();
+    const { error } = await supabaseAdmin.from("bookings").update(patch).eq("id", id);
     if (error) return res.status(500).json({ ok: false, error: error.message });
     await logEvent("closed", patch);
-    return res.status(200).json({ ok: true, row: data });
+    return finishAndReturn();
   }
 
-  if (status) {
-    const { data, error } = await supabaseAdmin
-      .from("bookings")
-      .update({ status })
-      .eq("id", id)
-      .select("*")
-      .single();
+  // Generic status change fallback
+  if (typeof status === "string" && status) {
+    const { error } = await supabaseAdmin.from("bookings").update({ status }).eq("id", id);
     if (error) return res.status(500).json({ ok: false, error: error.message });
     await logEvent("status_change", { to: status });
-    return res.status(200).json({ ok: true, row: data });
+    return finishAndReturn();
   }
 
   return res.status(400).json({ ok: false, error: "No recognized action" });
