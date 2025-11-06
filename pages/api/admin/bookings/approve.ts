@@ -1,184 +1,149 @@
+// pages/api/admin/bookings/approve.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 
+/** ---------- ENV + CLIENTS ---------- */
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY as string; // service key for RLS bypass on server
+const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
+const FROM_EMAIL = process.env.EMAIL_FROM || "JLA Trailer Rentals <noreply@send.jlatrailers.com>";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } });
+const resend = new Resend(RESEND_API_KEY);
+
+/** ---------- HELPERS ---------- */
 type MaybeArr<T> = T | T[] | null | undefined;
-const first = <T,>(v: MaybeArr<T>): T | undefined =>
-  Array.isArray(v) ? v[0] : (v ?? undefined);
+const first = <T,>(v: MaybeArr<T>): T | undefined => (Array.isArray(v) ? v[0] : (v ?? undefined));
 
-
-// -------- env / config --------
-const resend = new Resend(process.env.RESEND_API_KEY as string);
-
-// Prefer a domain-based From once Resend verifies your domain.
-// Example: JLA Trailer Rentals <noreply@jlatrailers.com>
-const FROM =
-  process.env.RESEND_FROM || "onboarding@resend.dev"; // TEMP fallback for testing
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
-  auth: { persistSession: false },
-});
-
-// -------- tiny helpers --------
-function bad(res: NextApiResponse, code: number, msg: string) {
-  return res.status(code).json({ ok: false, error: msg });
+function bad(res: NextApiResponse, status: number, message: string) {
+  return res.status(status).json({ ok: false, error: message });
+}
+function ok(res: NextApiResponse, data: any) {
+  return res.status(200).json({ ok: true, ...data });
 }
 
-function isValidHttpsUrl(url: string) {
+function isHttpUrl(s: string) {
   try {
-    const u = new URL(url);
-    return u.protocol === "https:";
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:";
   } catch {
     return false;
   }
 }
 
-// If you already have admin-session middleware, you can replace this check.
-function assertAdmin(req: NextApiRequest) {
-  // Example: your cookie-based session (adapt to your project)
-  // if (!req.cookies?.admin_session) throw new Error("unauthorized");
-  return true;
-}
-
-// -------- email template --------
-function paymentEmailHTML(opts: {
-  firstName?: string | null;
+/** Simple email HTML (keep it minimal to avoid spam filters) */
+function paymentEmailHTML(params: {
+  firstName?: string;
   rentalId: string;
-  trailerName?: string | null;
-  startDate: string;
-  endDate: string;
-  link: string;
+  trailerName?: string;
+  startDate?: string;
+  endDate?: string;
+  paymentLink: string;
 }) {
-  const name = (opts.firstName || "there").toString();
+  const { firstName, rentalId, trailerName, startDate, endDate, paymentLink } = params;
+  const greet = firstName ? `Hi ${firstName},` : "Hello,";
+
   return `
-  <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height:1.6; color:#0f172a">
-    <h2 style="margin:0 0 10px">Your JLA Trailer Rental – Action Needed</h2>
-    <p>Hi ${name},</p>
-    <p>Your booking <strong>${opts.rentalId}</strong> (${opts.trailerName || "Trailer"}) 
-       from <strong>${opts.startDate}</strong> to <strong>${opts.endDate}</strong> has been <strong>approved</strong>.</p>
-
-    <p style="margin:16px 0">Please complete the payment/deposit using the secure link below:</p>
-
-    <p style="margin:18px 0">
-      <a href="${opts.link}" 
-         style="background:#2563eb;color:#fff;padding:12px 16px;border-radius:10px;font-weight:800;text-decoration:none;display:inline-block">
-        Pay / Deposit – QuickBooks
-      </a>
-    </p>
-
-    <p>If the button doesn’t work, copy and paste this URL in your browser:</p>
-    <p style="word-break:break-all;color:#334155">${opts.link}</p>
-
-    <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0" />
-    <p style="font-size:12px;color:#64748b">
-      JLA Trailer Rentals · Miami, FL · jlatrailerental@gmail.com
-    </p>
+  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
+    <p>${greet}</p>
+    <p>Your booking <strong>${rentalId}</strong>${trailerName ? ` for <strong>${trailerName}</strong>` : ""}${
+    startDate && endDate ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>` : ""
+  } has been <strong>approved</strong>.</p>
+    <p>Please complete your payment using the link below:</p>
+    <p><a href="${paymentLink}" style="background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;display:inline-block">Pay now</a></p>
+    <p style="word-break:break-all">${paymentLink}</p>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
+    <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
   </div>
   `;
 }
 
+/** ---------- HANDLER ---------- */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") return bad(res, 405, "Method not allowed");
+
+  // Expect: { bookingId: string, paymentLink: string }
+  const { bookingId, paymentLink } = req.body || {};
+  if (!bookingId) return bad(res, 400, "Missing bookingId");
+  if (!paymentLink || !isHttpUrl(paymentLink)) return bad(res, 400, "Invalid paymentLink (must be http/https)");
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) return bad(res, 500, "Supabase server keys not configured");
+  if (!RESEND_API_KEY) return bad(res, 500, "RESEND_API_KEY not configured");
+
+  // 1) Fetch booking + client + trailer
+  const { data: booking, error: fetchErr } = await supabase
+    .from("bookings")
+    .select(
+      `
+      id, rental_id, status, start_date, end_date,
+      payment_link, payment_link_sent_at, approved_at,
+      clients:clients ( email, first_name ),
+      trailers:trailers ( name )
+    `
+    )
+    .eq("id", bookingId)
+    .single();
+
+  if (fetchErr || !booking) return bad(res, 404, "Booking not found");
+
+  const clientRec = first<{ email?: string; first_name?: string }>(booking.clients as any);
+  const trailerRec = first<{ name?: string }>(booking.trailers as any);
+
+  const customerEmail: string | undefined = clientRec?.email || undefined;
+  if (!customerEmail) return bad(res, 400, "Booking has no customer email");
+
+  // 2) Update booking: Approved + save link + timestamps
+  const nowISO = new Date().toISOString();
+  const { data: updated, error: updErr } = await supabase
+    .from("bookings")
+    .update({
+      status: "Approved",
+      payment_link: paymentLink,
+      approved_at: nowISO,
+      payment_link_sent_at: nowISO,
+    })
+    .eq("id", bookingId)
+    .select(
+      `
+      id, rental_id, status, start_date, end_date, payment_link, payment_link_sent_at, approved_at,
+      clients:clients ( email, first_name ),
+      trailers:trailers ( name )
+    `
+    )
+    .single();
+
+  if (updErr || !updated) return bad(res, 500, "Failed to update booking");
+
+  const updatedClient = first<{ email?: string; first_name?: string }>(updated.clients as any);
+  const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
+
+  // 3) Send email via Resend
+  const subject = `Payment link for your rental ${updated.rental_id}`;
+  const html = paymentEmailHTML({
+    firstName: updatedClient?.first_name,
+    rentalId: updated.rental_id,
+    trailerName: updatedTrailer?.name,
+    startDate: updated.start_date,
+    endDate: updated.end_date,
+    paymentLink,
+  });
+
   try {
-    if (req.method !== "POST") return bad(res, 405, "Method not allowed");
-    assertAdmin(req); // adapt to your auth
-
-    const { bookingId, paymentLink } = req.body as {
-      bookingId?: string;
-      paymentLink?: string;
-    };
-
-    if (!bookingId) return bad(res, 400, "Missing bookingId");
-    if (!paymentLink || !isValidHttpsUrl(paymentLink))
-      return bad(res, 400, "Please provide a valid https paymentLink");
-
-    // 1) Get booking + client info (email, name, trailer, dates)
-    const { data: booking, error: fetchErr } = await sb
-      .from("bookings")
-      .select(
-        `
-        id,
-        rental_id,
-        status,
-        start_date,
-        end_date,
-        clients ( email, first_name ),
-        trailers ( name )
-      `
-      )
-      .eq("id", bookingId)
-      .single();
-
-    if (fetchErr || !booking) return bad(res, 404, "Booking not found");
-
-    // BEFORE (breaks when `clients` is an array)
-// const customerEmail: string | undefined = booking.clients?.email || undefined;
-
-// AFTER (works for array OR single object)
-const clientRec = first<{ email?: string; first_name?: string }>(booking.clients as any);
-const customerEmail: string | undefined = clientRec?.email || undefined;
-if (!customerEmail) return bad(res, 400, "Booking has no customer email");
-
-
-    // 2) Update booking: set Approved + store link & timestamps
-    const { data: updated, error: updErr } = await sb
-      .from("bookings")
-      .update({
-        status: "Approved",
-        payment_link: paymentLink,
-        approved_at: new Date().toISOString(),
-        payment_link_sent_at: new Date().toISOString(),
-      })
-      .eq("id", bookingId)
-      .select(
-        `
-        id, rental_id, start_date, end_date,
-        clients ( email, first_name ),
-        trailers ( name )
-      `
-      )
-      .single();
-
-    if (updErr || !updated) return bad(res, 500, "Failed to update booking");
-
-    // 3) Optional audit trail
-    await sb.from("booking_events").insert({
-      booking_id: bookingId,
-      event_type: "approved",
-      details: { payment_link: paymentLink },
-    });
-
-    // 4) Send email via Resend
-    const subject = `Payment link for your rental ${updated.rental_id}`;
-    const html = paymentEmailHTML({
-      firstName: updated.clients?.first_name,
-      rentalId: updated.rental_id,
-      trailerName: updated.trailers?.name,
-      startDate: updated.start_date,
-      endDate: updated.end_date,
-      link: paymentLink,
-    });
-
-    const emailResp = await resend.emails.send({
-      from: FROM, // e.g. "JLA Trailer Rentals <noreply@jlatrailers.com>"
-      to: [customerEmail],
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: customerEmail,
       subject,
       html,
     });
-
-    if ((emailResp as any)?.error) {
-      // If email fails, keep booking Approved but report the error
-      return res.status(200).json({
-        ok: true,
-        row: updated,
-        email: { ok: false, error: (emailResp as any).error },
-      });
-    }
-
-    return res.status(200).json({ ok: true, row: updated, email: { ok: true } });
   } catch (e: any) {
-    console.error(e);
-    return bad(res, 500, e?.message || "Unexpected error");
+    // If email fails, still return 200 with a flag; UI can show a toast
+    return ok(res, {
+      row: updated,
+      emailSent: false,
+      emailError: e?.message || "Failed to send email",
+    });
   }
+
+  return ok(res, { row: updated, emailSent: true });
 }
