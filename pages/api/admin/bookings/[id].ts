@@ -11,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
+  // Require admin access
   if (!requireAdmin(req, res)) return;
 
   const id = req.query.id as string;
@@ -23,17 +24,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     close_reason,             // string | null
     reschedule_notify_only,   // boolean
 
-    // Reschedule inputs (YYYY-MM-DD)
-    reschedule_start,
-    reschedule_end,
+    // ✅ NEW: for rescheduling
+    reschedule_start,         // YYYY-MM-DD
+    reschedule_end,           // YYYY-MM-DD
   } = (req.body ?? {}) as Record<string, any>;
 
-  // -------- helpers --------
+  // ------------------------
+  // Helpers
+  // ------------------------
   async function logEvent(kind: string, details: Record<string, any> = {}) {
     await supabaseAdmin
       .from("booking_events")
       .insert({ booking_id: id, kind, details })
-      .then(() => {}, () => {}); // ignore log errors
+      .then(() => {}, () => {}); // ignore logging errors silently
   }
 
   async function fetchFullRow() {
@@ -52,25 +55,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   async function finishAndReturn() {
     const { data: row, error } = await fetchFullRow();
-    if (error || !row) return res.status(500).json({ ok: false, error: error?.message || "Fetch failed" });
+    if (error || !row) {
+      return res.status(500).json({ ok: false, error: error?.message || "Fetch failed" });
+    }
     return res.status(200).json({ ok: true, row });
   }
 
-  // -------- actions --------
-
-  // ✅ Apply reschedule (date change) – no status change
+  // ------------------------
+  // 1️⃣ Reschedule booking
+  // ------------------------
   if (reschedule_start && reschedule_end) {
-    // Basic validation
     const iso = /^\d{4}-\d{2}-\d{2}$/;
-    if (typeof reschedule_start !== "string" || typeof reschedule_end !== "string" ||
-        !iso.test(reschedule_start) || !iso.test(reschedule_end)) {
+    if (
+      typeof reschedule_start !== "string" ||
+      typeof reschedule_end !== "string" ||
+      !iso.test(reschedule_start) ||
+      !iso.test(reschedule_end)
+    ) {
       return res.status(400).json({ ok: false, error: "Invalid reschedule dates" });
     }
-    if (new Date(reschedule_start) > new Date(reschedule_end)) {
+
+    const startDate = new Date(reschedule_start);
+    const endDate = new Date(reschedule_end);
+    if (startDate > endDate) {
       return res.status(400).json({ ok: false, error: "Start date must be before or equal to end date" });
     }
 
-    // Read previous dates for audit trail
+    // Fetch current dates for log
     const { data: before, error: beforeErr } = await supabaseAdmin
       .from("bookings")
       .select("start_date, end_date")
@@ -80,7 +91,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     const { error: updErr } = await supabaseAdmin
       .from("bookings")
-      .update({ start_date: reschedule_start, end_date: reschedule_end })
+      .update({
+        start_date: reschedule_start,
+        end_date: reschedule_end,
+      })
       .eq("id", id);
     if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
 
@@ -92,7 +106,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return finishAndReturn();
   }
 
-  // Mark Paid
+  // ------------------------
+  // 2️⃣ Mark booking as Paid
+  // ------------------------
   if (mark_paid) {
     const patch: any = { status: "Paid", paid_at: new Date().toISOString() };
     const { error } = await supabaseAdmin.from("bookings").update(patch).eq("id", id);
@@ -101,13 +117,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return finishAndReturn();
   }
 
-  // Reschedule notify only (no DB change)
+  // ------------------------
+  // 3️⃣ Only send reschedule email/notice
+  // ------------------------
   if (reschedule_notify_only) {
     await logEvent("reschedule_notify", {});
     return res.status(200).json({ ok: true });
   }
 
-  // Approve
+  // ------------------------
+  // 4️⃣ Approve booking
+  // ------------------------
   if (status === "Approved") {
     const patch: any = { status: "Approved", approved_at: new Date().toISOString() };
     const { error } = await supabaseAdmin.from("bookings").update(patch).eq("id", id);
@@ -116,7 +136,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return finishAndReturn();
   }
 
-  // Close (Finished or Cancelled)
+  // ------------------------
+  // 5️⃣ Close (Finished or Cancelled)
+  // ------------------------
   if (status === "Closed") {
     const patch: any = {
       status: "Closed",
@@ -129,7 +151,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return finishAndReturn();
   }
 
-  // Generic status change fallback
+  // ------------------------
+  // 6️⃣ Generic status fallback
+  // ------------------------
   if (typeof status === "string" && status) {
     const { error } = await supabaseAdmin.from("bookings").update({ status }).eq("id", id);
     if (error) return res.status(500).json({ ok: false, error: error.message });
@@ -137,5 +161,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return finishAndReturn();
   }
 
+  // ------------------------
+  // 7️⃣ No recognized action
+  // ------------------------
   return res.status(400).json({ ok: false, error: "No recognized action" });
 }
