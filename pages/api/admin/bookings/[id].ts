@@ -46,6 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         id, rental_id, status, start_date, end_date, delivery_requested,
         created_at, paid_at, approved_at, payment_link, payment_link_sent_at,
         close_outcome, close_reason,
+        trailer_id,                               -- 👈 important for availability checks
         trailers:trailers ( name ),
         clients:clients ( first_name, last_name, email )
       `)
