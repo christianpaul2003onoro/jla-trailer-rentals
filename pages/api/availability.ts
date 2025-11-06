@@ -4,7 +4,7 @@
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
-import { requireAdmin } from "../../server/adminauth"; // ← keep this while used by Admin only
+import { requireAdmin } from "../../server/adminauth"; // keep this while used by Admin only
 
 type Ok = {
   ok: true;
@@ -40,11 +40,20 @@ export default async function handler(
 
   // Basic guards
   const iso = /^\d{4}-\d{2}-\d{2}$/;
-  if (typeof startDate !== "string" || typeof endDate !== "string" || !iso.test(startDate) || !iso.test(endDate)) {
-    return res.status(400).json({ ok: false, error: "Dates must be YYYY-MM-DD strings." });
+  if (
+    typeof startDate !== "string" ||
+    typeof endDate !== "string" ||
+    !iso.test(startDate) ||
+    !iso.test(endDate)
+  ) {
+    return res
+      .status(400)
+      .json({ ok: false, error: "Dates must be YYYY-MM-DD strings." });
   }
   if (new Date(startDate) > new Date(endDate)) {
-    return res.status(400).json({ ok: false, error: "startDate must be <= endDate." });
+    return res
+      .status(400)
+      .json({ ok: false, error: "startDate must be <= endDate." });
   }
 
   // Active bookings that block availability
