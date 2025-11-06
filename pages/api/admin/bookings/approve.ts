@@ -2,12 +2,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
+import { requireAdmin } from "../../../../server/adminauth";
 
 /** ---------- ENV + CLIENTS ---------- */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY as string; // service key for RLS bypass on server
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY as string; // server-side only
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
-const FROM_EMAIL = process.env.EMAIL_FROM || "JLA Trailer Rentals <noreply@send.jlatrailers.com>";
+const FROM_EMAIL = process.env.EMAIL_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } });
 const resend = new Resend(RESEND_API_KEY);
@@ -22,7 +23,6 @@ function bad(res: NextApiResponse, status: number, message: string) {
 function ok(res: NextApiResponse, data: any) {
   return res.status(200).json({ ok: true, ...data });
 }
-
 function isHttpUrl(s: string) {
   try {
     const u = new URL(s);
@@ -32,7 +32,7 @@ function isHttpUrl(s: string) {
   }
 }
 
-/** Simple email HTML (keep it minimal to avoid spam filters) */
+/** Simple email HTML */
 function paymentEmailHTML(params: {
   firstName?: string;
   rentalId: string;
@@ -43,25 +43,26 @@ function paymentEmailHTML(params: {
 }) {
   const { firstName, rentalId, trailerName, startDate, endDate, paymentLink } = params;
   const greet = firstName ? `Hi ${firstName},` : "Hello,";
-
   return `
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
     <p>${greet}</p>
     <p>Your booking <strong>${rentalId}</strong>${trailerName ? ` for <strong>${trailerName}</strong>` : ""}${
-    startDate && endDate ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>` : ""
-  } has been <strong>approved</strong>.</p>
+      startDate && endDate ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>` : ""
+    } has been <strong>approved</strong>.</p>
     <p>Please complete your payment using the link below:</p>
     <p><a href="${paymentLink}" style="background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;display:inline-block">Pay now</a></p>
     <p style="word-break:break-all">${paymentLink}</p>
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
     <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
-  </div>
-  `;
+  </div>`;
 }
 
 /** ---------- HANDLER ---------- */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return bad(res, 405, "Method not allowed");
+
+  // 🔒 admin session required
+  if (!requireAdmin(req, res)) return;
 
   // Expect: { bookingId: string, paymentLink: string }
   const { bookingId, paymentLink } = req.body || {};
@@ -74,14 +75,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // 1) Fetch booking + client + trailer
   const { data: booking, error: fetchErr } = await supabase
     .from("bookings")
-    .select(
-      `
+    .select(`
       id, rental_id, status, start_date, end_date,
       payment_link, payment_link_sent_at, approved_at,
       clients:clients ( email, first_name ),
       trailers:trailers ( name )
-    `
-    )
+    `)
     .eq("id", bookingId)
     .single();
 
@@ -93,7 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const customerEmail: string | undefined = clientRec?.email || undefined;
   if (!customerEmail) return bad(res, 400, "Booking has no customer email");
 
-  // 2) Update booking: Approved + save link + timestamps
+  // 2) Update booking → Approved + link + timestamps
   const nowISO = new Date().toISOString();
   const { data: updated, error: updErr } = await supabase
     .from("bookings")
@@ -104,13 +103,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       payment_link_sent_at: nowISO,
     })
     .eq("id", bookingId)
-    .select(
-      `
+    .select(`
       id, rental_id, status, start_date, end_date, payment_link, payment_link_sent_at, approved_at,
       clients:clients ( email, first_name ),
       trailers:trailers ( name )
-    `
-    )
+    `)
     .single();
 
   if (updErr || !updated) return bad(res, 500, "Failed to update booking");
@@ -118,7 +115,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const updatedClient = first<{ email?: string; first_name?: string }>(updated.clients as any);
   const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
 
-  // 3) Send email via Resend
+  // 3) Send email
   const subject = `Payment link for your rental ${updated.rental_id}`;
   const html = paymentEmailHTML({
     firstName: updatedClient?.first_name,
@@ -130,19 +127,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      to: customerEmail,
-      subject,
-      html,
-    });
+    await resend.emails.send({ from: FROM_EMAIL, to: customerEmail, subject, html });
   } catch (e: any) {
-    // If email fails, still return 200 with a flag; UI can show a toast
-    return ok(res, {
-      row: updated,
-      emailSent: false,
-      emailError: e?.message || "Failed to send email",
-    });
+    // Still return success with the updated row; UI can show a warning if email failed
+    return ok(res, { row: updated, emailSent: false, emailError: e?.message || "Failed to send email" });
   }
 
   return ok(res, { row: updated, emailSent: true });
