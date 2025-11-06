@@ -16,9 +16,13 @@ type Row = {
   delivery_requested: boolean;
   created_at: string;
   paid_at?: string | null;
-  payment_link?: string | null; // ← optional, used to prefill the modal
+  payment_link?: string | null;
   trailers?: { name?: string } | null;
-  clients?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
+  clients?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+  } | null;
 };
 
 export default function AdminHome() {
@@ -37,19 +41,30 @@ export default function AdminHome() {
   const [approveFor, setApproveFor] = useState<null | Row>(null);
 
   async function refreshRows() {
-    setLoading(true);
-    const resp = await fetch("/api/admin/bookings"); // cookie session
-    if (resp.status === 401) {
-      window.location.href = "/admin/login";
-      return;
+    try {
+      setLoading(true);
+      const resp = await fetch("/api/admin/bookings");
+      if (resp.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+      const json = await resp.json();
+      setRows(json?.rows ?? []);
+    } finally {
+      setLoading(false);
     }
-    const json = await resp.json();
-    setRows(json?.rows ?? []);
-    setLoading(false);
   }
 
+  // initial load
   useEffect(() => {
     refreshRows();
+  }, []);
+
+  // refresh whenever the tab regains focus (returning from /admin/bookings/[id])
+  useEffect(() => {
+    const onFocus = () => refreshRows();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
   async function patchStatus(id: string, body: Record<string, any>) {
@@ -65,28 +80,38 @@ export default function AdminHome() {
       return false;
     }
 
-    // If the API returns a full joined row, update it in-place.
+    // If API returned a full joined row, merge it safely so nested objects don't flicker to "—"
     if (json?.row) {
-      setRows(prev => prev.map(r => (r.id === id ? json.row : r)));
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.id !== id) return r;
+          const updated = json.row as Row;
+          return {
+            ...r,
+            ...updated,
+            clients: updated.clients ?? r.clients,
+            trailers: updated.trailers ?? r.trailers,
+          };
+        })
+      );
       return true;
     }
 
-    // Some actions (like reschedule notify) intentionally return no row.
-    // In that case, refetch the table so we don't show placeholder values.
+    // Some actions (like notify only) don't return a row — refetch so UI stays accurate
     await refreshRows();
     return true;
   }
 
-  // kept for completeness (not used once ApproveModal is in place)
+  // (kept for completeness)
   async function approve(id: string) {
     const ok = await patchStatus(id, { status: "Approved" });
-    if (ok) setRows(p => p.map(r => (r.id === id ? { ...r, status: "Approved" } : r)));
+    if (ok) setRows((p) => p.map((r) => (r.id === id ? { ...r, status: "Approved" } : r)));
   }
 
   async function markPaid(id: string) {
     if (!confirm("Confirm deposit/payment received?")) return;
     const ok = await patchStatus(id, { mark_paid: true });
-    if (ok) setRows(p => p.map(r => (r.id === id ? { ...r, status: "Paid" } : r)));
+    if (ok) setRows((p) => p.map((r) => (r.id === id ? { ...r, status: "Paid" } : r)));
   }
 
   function openCloseModal(row: Row, preset: "completed" | "cancelled" | "reschedule") {
@@ -105,7 +130,6 @@ export default function AdminHome() {
   const policyNote = useMemo(() => {
     if (!closing) return "";
     if (outcome === "cancelled") {
-      // advisory only (money handled in QuickBooks)
       if (closing.status === "Paid") {
         return "Policy: cancel ≤24h after deposit → FULL REFUND; after 24h → deposit forfeited.";
       }
@@ -143,7 +167,7 @@ export default function AdminHome() {
 
     const ok = await patchStatus(closing.id, body);
     if (ok) {
-      setRows(p => p.map(r => (r.id === closing.id ? { ...r, status: "Closed" } : r)));
+      setRows((p) => p.map((r) => (r.id === closing.id ? { ...r, status: "Closed" } : r)));
       setClosing(null);
     }
   }
@@ -152,7 +176,6 @@ export default function AdminHome() {
     if (r.status === "Pending") {
       return (
         <div style={actionsWrap}>
-          {/* Open Approve modal to capture QuickBooks link and send email */}
           <button style={btn} onClick={() => setApproveFor(r)}>Approve</button>
           <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>Close</button>
         </div>
@@ -295,7 +318,6 @@ export default function AdminHome() {
         </div>
       )}
 
-      {/* Approve & Send Payment Link Modal */}
       {approveFor && (
         <ApproveModal
           open={true}
