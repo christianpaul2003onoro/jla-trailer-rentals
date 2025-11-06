@@ -2,6 +2,11 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 
+type MaybeArr<T> = T | T[] | null | undefined;
+const first = <T,>(v: MaybeArr<T>): T | undefined =>
+  Array.isArray(v) ? v[0] : (v ?? undefined);
+
+
 // -------- env / config --------
 const resend = new Resend(process.env.RESEND_API_KEY as string);
 
@@ -107,8 +112,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (fetchErr || !booking) return bad(res, 404, "Booking not found");
 
-    const customerEmail: string | undefined = booking.clients?.email || undefined;
-    if (!customerEmail) return bad(res, 400, "Booking has no customer email");
+    // BEFORE (breaks when `clients` is an array)
+// const customerEmail: string | undefined = booking.clients?.email || undefined;
+
+// AFTER (works for array OR single object)
+const clientRec = first<{ email?: string; first_name?: string }>(booking.clients as any);
+const customerEmail: string | undefined = clientRec?.email || undefined;
+if (!customerEmail) return bad(res, 400, "Booking has no customer email");
+
 
     // 2) Update booking: set Approved + store link & timestamps
     const { data: updated, error: updErr } = await sb
