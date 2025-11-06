@@ -59,11 +59,21 @@ export default function AdminHome() {
       body: JSON.stringify(body),
     });
     const json = await resp.json();
+
     if (!json?.ok) {
       alert(json?.error || "Could not update status.");
       return false;
     }
-    if (json?.row) setRows(prev => prev.map(r => (r.id === id ? json.row : r)));
+
+    // If the API returns a full joined row, update it in-place.
+    if (json?.row) {
+      setRows(prev => prev.map(r => (r.id === id ? json.row : r)));
+      return true;
+    }
+
+    // Some actions (like reschedule notify) intentionally return no row.
+    // In that case, refetch the table so we don't show placeholder values.
+    await refreshRows();
     return true;
   }
 
