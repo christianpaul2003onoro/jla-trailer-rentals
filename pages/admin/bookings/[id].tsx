@@ -11,14 +11,26 @@ type Row = {
   status: string;
   start_date: string; // ISO
   end_date: string;   // ISO
+  trailer_id?: string | null; // <-- needed for availability; safe if missing
   trailers?: { name?: string | null } | null;
   clients?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
 };
 
+type AvailOK = {
+  ok: true;
+  available: boolean;
+  conflicts: Array<{
+    rentalId: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+  }>;
+};
+type AvailErr = { ok: false; error: string };
+
 function toInputDate(v?: string | null) {
   if (!v) return "";
-  // ensure YYYY-MM-DD for <input type="date">
-  return v.slice(0, 10);
+  return v.slice(0, 10); // YYYY-MM-DD for <input type="date">
 }
 
 export default function BookingDetails() {
@@ -36,6 +48,16 @@ export default function BookingDetails() {
   const [noteOnlySending, setNoteOnlySending] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // availability state
+  const [checking, setChecking] = useState(false);
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [conflicts, setConflicts] = useState<AvailOK["conflicts"]>([]);
+  const [availErr, setAvailErr] = useState<string | null>(null);
+
+  const canCheckAvailability = useMemo(() => {
+    return !!row?.trailer_id && !!start && !!end && new Date(start) <= new Date(end);
+  }, [row?.trailer_id, start, end]);
+
   // Load the booking by reading the admin list and filtering by id (no extra GET route required)
   useEffect(() => {
     if (!id) return;
@@ -49,13 +71,14 @@ export default function BookingDetails() {
           return;
         }
         const json = await resp.json();
-        const found = (json?.rows ?? []).find((r: Row) => r.id === id) || null;
-        setRow(found);
-        if (found) {
+        const found = (json?.rows ?? []).find((r: Row) => r.id === id) as Row | undefined;
+        if (!found) {
+          setErr("Booking not found.");
+          setRow(null);
+        } else {
+          setRow(found);
           setStart(toInputDate(found.start_date));
           setEnd(toInputDate(found.end_date));
-        } else {
-          setErr("Booking not found.");
         }
       } catch (e: any) {
         setErr(e?.message || "Failed to load booking.");
@@ -73,6 +96,52 @@ export default function BookingDetails() {
     return full || "—";
   }, [row]);
 
+  async function checkAvailability() {
+    if (!row?.trailer_id) {
+      setAvailErr("Trailer not loaded; availability check disabled on this page.");
+      setAvailable(null);
+      setConflicts([]);
+      return;
+    }
+    if (!start || !end) {
+      setAvailErr("Select start and end dates first.");
+      setAvailable(null);
+      setConflicts([]);
+      return;
+    }
+    setAvailErr(null);
+    setChecking(true);
+    setAvailable(null);
+    setConflicts([]);
+    try {
+      const resp = await fetch("/api/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trailerId: row.trailer_id,
+          startDate: start,
+          endDate: end,
+          excludeBookingId: row.id, // server may ignore if not supported
+        }),
+      });
+      const json: AvailOK | AvailErr = await resp.json();
+      if (!json.ok) {
+        setAvailErr(json.error || "Availability check failed.");
+        setAvailable(null);
+        setConflicts([]);
+      } else {
+        setAvailable(json.available);
+        setConflicts(json.conflicts);
+      }
+    } catch (e: any) {
+      setAvailErr(e?.message || "Availability check failed.");
+      setAvailable(null);
+      setConflicts([]);
+    } finally {
+      setChecking(false);
+    }
+  }
+
   async function applyReschedule() {
     if (!row) return;
     setSuccessMsg(null);
@@ -85,6 +154,10 @@ export default function BookingDetails() {
     }
     if (new Date(start) > new Date(end)) {
       setErr("Start date must be before or equal to end date.");
+      return;
+    }
+    if (available === false) {
+      setErr("Selected dates conflict with existing bookings.");
       return;
     }
 
@@ -106,6 +179,10 @@ export default function BookingDetails() {
         setStart(toInputDate(json.row?.start_date));
         setEnd(toInputDate(json.row?.end_date));
         setSuccessMsg("Dates updated successfully.");
+        // reset availability state to avoid stale UI
+        setAvailable(null);
+        setConflicts([]);
+        setAvailErr(null);
       }
     } catch (e: any) {
       setErr(e?.message || "Network error.");
@@ -160,7 +237,10 @@ export default function BookingDetails() {
             <div style={{ display: "grid", gap: 6 }}>
               <div><strong>Rental ID:</strong> {row.rental_id}</div>
               <div><strong>Status:</strong> {row.status}</div>
-              <div><strong>Customer:</strong> {customerName} <span style={{ color: "#9ca3af" }}>({row.clients?.email || "—"})</span></div>
+              <div>
+                <strong>Customer:</strong> {customerName}{" "}
+                <span style={{ color: "#9ca3af" }}>({row.clients?.email || "—"})</span>
+              </div>
               <div><strong>Trailer:</strong> {row.trailers?.name || "—"}</div>
               <div><strong>Current dates:</strong> {toInputDate(row.start_date)} → {toInputDate(row.end_date)}</div>
             </div>
@@ -181,7 +261,7 @@ export default function BookingDetails() {
                 <input
                   type="date"
                   value={start}
-                  onChange={(e) => setStart(e.target.value)}
+                  onChange={(e) => { setStart(e.target.value); setAvailable(null); setConflicts([]); setAvailErr(null); }}
                   style={input}
                 />
               </label>
@@ -191,17 +271,61 @@ export default function BookingDetails() {
                 <input
                   type="date"
                   value={end}
-                  onChange={(e) => setEnd(e.target.value)}
+                  onChange={(e) => { setEnd(e.target.value); setAvailable(null); setConflicts([]); setAvailErr(null); }}
                   style={input}
                 />
               </label>
             </div>
 
+            {/* Availability controls / messages */}
+            <div style={{ marginTop: 10 }}>
+              {row.trailer_id ? (
+                <button onClick={checkAvailability} disabled={checking || !canCheckAvailability} style={btnGhost}>
+                  {checking ? "Checking…" : "Check availability"}
+                </button>
+              ) : (
+                <div style={{ color: "#f59e0b", fontSize: 13 }}>
+                  Trailer not loaded; availability check disabled (this page needs trailer_id).
+                </div>
+              )}
+            </div>
+
+            {availErr && <div style={{ color: "#f87171", marginTop: 8 }}>{availErr}</div>}
+
+            {available !== null && (
+              <div style={{ marginTop: 8 }}>
+                {available ? (
+                  <div style={{ color: "#86efac" }}>✅ Dates are available.</div>
+                ) : (
+                  <div style={{ color: "#f87171" }}>
+                    ❌ Dates conflict with {conflicts.length} booking{conflicts.length === 1 ? "" : "s"}:
+                    <ul style={{ marginTop: 6 }}>
+                      {conflicts.map((c, i) => (
+                        <li key={i}>
+                          {c.rentalId}: {c.startDate} → {c.endDate} ({c.status})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
             {successMsg && <div style={{ color: "#86efac", marginTop: 10 }}>{successMsg}</div>}
             {err && !loading && <div style={{ color: "#f87171", marginTop: 10 }}>{err}</div>}
 
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button onClick={applyReschedule} disabled={sending} style={btnPrimary}>
+              <button
+                onClick={applyReschedule}
+                disabled={
+                  sending ||
+                  !start ||
+                  !end ||
+                  new Date(start) > new Date(end) ||
+                  available === false
+                }
+                style={btnPrimary}
+              >
                 {sending ? "Saving…" : "Apply Reschedule"}
               </button>
               <button onClick={notifyOnly} disabled={noteOnlySending} style={btnGhost}>
