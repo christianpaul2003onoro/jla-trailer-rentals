@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     close_reason,             // string | null
     reschedule_notify_only,   // boolean
 
-    // 👇 NEW: reschedule inputs (YYYY-MM-DD)
+    // Reschedule inputs (YYYY-MM-DD)
     reschedule_start,
     reschedule_end,
   } = (req.body ?? {}) as Record<string, any>;
@@ -33,21 +33,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     await supabaseAdmin
       .from("booking_events")
       .insert({ booking_id: id, kind, details })
-      .then(() => {}, () => {});
+      .then(() => {}, () => {}); // ignore log errors
   }
 
   async function fetchFullRow() {
     return supabaseAdmin
       .from("bookings")
-      .select(
-        `
+      .select(`
         id, rental_id, status, start_date, end_date, delivery_requested,
         created_at, paid_at, approved_at, payment_link, payment_link_sent_at,
         close_outcome, close_reason,
         trailers:trailers ( name ),
         clients:clients ( first_name, last_name, email )
-      `
-      )
+      `)
       .eq("id", id)
       .single();
   }
@@ -60,11 +58,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   // -------- actions --------
 
-  // ✅ NEW: Apply reschedule (date change)
+  // ✅ Apply reschedule (date change) – no status change
   if (reschedule_start && reschedule_end) {
-    // basic guard (keep it simple, your UI already sends valid values)
-    if (typeof reschedule_start !== "string" || typeof reschedule_end !== "string") {
+    // Basic validation
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    if (typeof reschedule_start !== "string" || typeof reschedule_end !== "string" ||
+        !iso.test(reschedule_start) || !iso.test(reschedule_end)) {
       return res.status(400).json({ ok: false, error: "Invalid reschedule dates" });
+    }
+    if (new Date(reschedule_start) > new Date(reschedule_end)) {
+      return res.status(400).json({ ok: false, error: "Start date must be before or equal to end date" });
     }
 
     // Read previous dates for audit trail
@@ -98,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return finishAndReturn();
   }
 
-  // Only send an email/notice for reschedule (no DB change)
+  // Reschedule notify only (no DB change)
   if (reschedule_notify_only) {
     await logEvent("reschedule_notify", {});
     return res.status(200).json({ ok: true });
