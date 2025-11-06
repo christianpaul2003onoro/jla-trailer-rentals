@@ -22,6 +22,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     close_outcome,            // "completed" | "cancelled"
     close_reason,             // string | null
     reschedule_notify_only,   // boolean
+
+    // 👇 NEW: reschedule inputs (YYYY-MM-DD)
+    reschedule_start,
+    reschedule_end,
   } = (req.body ?? {}) as Record<string, any>;
 
   // -------- helpers --------
@@ -55,6 +59,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 
   // -------- actions --------
+
+  // ✅ NEW: Apply reschedule (date change)
+  if (reschedule_start && reschedule_end) {
+    // basic guard (keep it simple, your UI already sends valid values)
+    if (typeof reschedule_start !== "string" || typeof reschedule_end !== "string") {
+      return res.status(400).json({ ok: false, error: "Invalid reschedule dates" });
+    }
+
+    // Read previous dates for audit trail
+    const { data: before, error: beforeErr } = await supabaseAdmin
+      .from("bookings")
+      .select("start_date, end_date")
+      .eq("id", id)
+      .single();
+    if (beforeErr) return res.status(500).json({ ok: false, error: beforeErr.message });
+
+    const { error: updErr } = await supabaseAdmin
+      .from("bookings")
+      .update({ start_date: reschedule_start, end_date: reschedule_end })
+      .eq("id", id);
+    if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
+
+    await logEvent("rescheduled", {
+      from: { start: before?.start_date, end: before?.end_date },
+      to: { start: reschedule_start, end: reschedule_end },
+    });
+
+    return finishAndReturn();
+  }
 
   // Mark Paid
   if (mark_paid) {
