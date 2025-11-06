@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import AdminLayout from "../../components/AdminLayout";
 import StatusPill from "../../components/StatusPill";
+import ApproveModal from "../../components/ApproveModal";
 
 type Status = "Pending" | "Approved" | "Paid" | "Closed" | "Rejected";
 
@@ -15,6 +16,7 @@ type Row = {
   delivery_requested: boolean;
   created_at: string;
   paid_at?: string | null;
+  payment_link?: string | null; // ← optional, used to prefill the modal
   trailers?: { name?: string } | null;
   clients?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
 };
@@ -23,7 +25,7 @@ export default function AdminHome() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // modal state
+  // modal state (Close flow)
   const [closing, setClosing] = useState<null | Row>(null);
   const [outcome, setOutcome] = useState<"completed" | "cancelled" | "reschedule">("completed");
   const [reason, setReason] = useState("");
@@ -31,18 +33,23 @@ export default function AdminHome() {
   const [sendCancelEmail, setSendCancelEmail] = useState(true);
   const [sendRescheduleEmail, setSendRescheduleEmail] = useState(true);
 
+  // modal state (Approve + payment link)
+  const [approveFor, setApproveFor] = useState<null | Row>(null);
+
+  async function refreshRows() {
+    setLoading(true);
+    const resp = await fetch("/api/admin/bookings"); // cookie session
+    if (resp.status === 401) {
+      window.location.href = "/admin/login";
+      return;
+    }
+    const json = await resp.json();
+    setRows(json?.rows ?? []);
+    setLoading(false);
+  }
+
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const resp = await fetch("/api/admin/bookings"); // cookie session
-      if (resp.status === 401) {
-        window.location.href = "/admin/login";
-        return;
-      }
-      const json = await resp.json();
-      setRows(json?.rows ?? []);
-      setLoading(false);
-    })();
+    refreshRows();
   }, []);
 
   async function patchStatus(id: string, body: Record<string, any>) {
@@ -60,6 +67,7 @@ export default function AdminHome() {
     return true;
   }
 
+  // kept for completeness (not used once ApproveModal is in place)
   async function approve(id: string) {
     const ok = await patchStatus(id, { status: "Approved" });
     if (ok) setRows(p => p.map(r => (r.id === id ? { ...r, status: "Approved" } : r)));
@@ -134,7 +142,8 @@ export default function AdminHome() {
     if (r.status === "Pending") {
       return (
         <div style={actionsWrap}>
-          <button style={btn} onClick={() => approve(r.id)}>Approve</button>
+          {/* Open Approve modal to capture QuickBooks link and send email */}
+          <button style={btn} onClick={() => setApproveFor(r)}>Approve</button>
           <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>Close</button>
         </div>
       );
@@ -274,6 +283,17 @@ export default function AdminHome() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Approve & Send Payment Link Modal */}
+      {approveFor && (
+        <ApproveModal
+          open={true}
+          onClose={() => setApproveFor(null)}
+          bookingId={approveFor.id}
+          defaultLink={approveFor.payment_link || ""}
+          onSuccess={refreshRows}
+        />
       )}
     </AdminLayout>
   );
