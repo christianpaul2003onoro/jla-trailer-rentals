@@ -8,14 +8,18 @@ import { requireAdmin } from "../../../../server/adminauth";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY as string; // server-side only
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
-const FROM_EMAIL = process.env.EMAIL_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+const FROM_EMAIL =
+  process.env.EMAIL_FROM || "JLA Trailer Rentals <noreply@send.jlatrailers.com>";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } });
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
+  auth: { persistSession: false },
+});
 const resend = new Resend(RESEND_API_KEY);
 
 /** ---------- HELPERS ---------- */
 type MaybeArr<T> = T | T[] | null | undefined;
-const first = <T,>(v: MaybeArr<T>): T | undefined => (Array.isArray(v) ? v[0] : (v ?? undefined));
+const first = <T,>(v: MaybeArr<T>): T | undefined =>
+  (Array.isArray(v) ? v[0] : (v ?? undefined));
 
 function bad(res: NextApiResponse, status: number, message: string) {
   return res.status(status).json({ ok: false, error: message });
@@ -41,14 +45,19 @@ function paymentEmailHTML(params: {
   endDate?: string;
   paymentLink: string;
 }) {
-  const { firstName, rentalId, trailerName, startDate, endDate, paymentLink } = params;
+  const { firstName, rentalId, trailerName, startDate, endDate, paymentLink } =
+    params;
   const greet = firstName ? `Hi ${firstName},` : "Hello,";
   return `
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
     <p>${greet}</p>
-    <p>Your booking <strong>${rentalId}</strong>${trailerName ? ` for <strong>${trailerName}</strong>` : ""}${
-      startDate && endDate ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>` : ""
-    } has been <strong>approved</strong>.</p>
+    <p>Your booking <strong>${rentalId}</strong>${
+      trailerName ? ` for <strong>${trailerName}</strong>` : ""
+    }${
+    startDate && endDate
+      ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>`
+      : ""
+  } has been <strong>approved</strong>.</p>
     <p>Please complete your payment using the link below:</p>
     <p><a href="${paymentLink}" style="background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;display:inline-block">Pay now</a></p>
     <p style="word-break:break-all">${paymentLink}</p>
@@ -65,12 +74,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!requireAdmin(req, res)) return;
 
   // Expect: { bookingId: string, paymentLink: string }
-  const { bookingId, paymentLink } = req.body || {};
+  const { bookingId, paymentLink } = (req.body ?? {}) as {
+    bookingId?: string;
+    paymentLink?: string;
+  };
   if (!bookingId) return bad(res, 400, "Missing bookingId");
-  if (!paymentLink || !isHttpUrl(paymentLink)) return bad(res, 400, "Invalid paymentLink (must be http/https)");
+  if (!paymentLink || !isHttpUrl(paymentLink))
+    return bad(res, 400, "Invalid paymentLink (must be http/https)");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) return bad(res, 500, "Supabase server keys not configured");
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE)
+    return bad(res, 500, "Supabase server keys not configured");
   if (!RESEND_API_KEY) return bad(res, 500, "RESEND_API_KEY not configured");
+  if (!FROM_EMAIL) return bad(res, 500, "EMAIL_FROM not configured");
 
   // 1) Fetch booking + client + trailer
   const { data: booking, error: fetchErr } = await supabase
@@ -86,7 +101,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (fetchErr || !booking) return bad(res, 404, "Booking not found");
 
-  const clientRec = first<{ email?: string; first_name?: string }>(booking.clients as any);
+  const clientRec = first<{ email?: string; first_name?: string }>(
+    booking.clients as any
+  );
   const trailerRec = first<{ name?: string }>(booking.trailers as any);
 
   const customerEmail: string | undefined = clientRec?.email || undefined;
@@ -112,26 +129,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (updErr || !updated) return bad(res, 500, "Failed to update booking");
 
-  const updatedClient = first<{ email?: string; first_name?: string }>(updated.clients as any);
-  const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
-
-  // 3) Send email
+  // 3) Send email (don’t fail whole request if email send fails)
   const subject = `Payment link for your rental ${updated.rental_id}`;
   const html = paymentEmailHTML({
-    firstName: updatedClient?.first_name,
+    firstName: clientRec?.first_name,
     rentalId: updated.rental_id,
-    trailerName: updatedTrailer?.name,
+    trailerName: trailerRec?.name,
     startDate: updated.start_date,
     endDate: updated.end_date,
     paymentLink,
   });
 
   try {
-    await resend.emails.send({ from: FROM_EMAIL, to: customerEmail, subject, html });
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: customerEmail,
+      subject,
+      html,
+    });
+    return ok(res, { row: updated, emailSent: true });
   } catch (e: any) {
-    // Still return success with the updated row; UI can show a warning if email failed
-    return ok(res, { row: updated, emailSent: false, emailError: e?.message || "Failed to send email" });
+    console.error("Resend error:", e?.message || e);
+    return ok(res, {
+      row: updated,
+      emailSent: false,
+      emailError: e?.message || "Failed to send email",
+    });
   }
-
-  return ok(res, { row: updated, emailSent: true });
 }
