@@ -1,5 +1,3 @@
-// components/ApproveModal.tsx
-
 import { useEffect, useState } from "react";
 
 type Props = {
@@ -10,27 +8,33 @@ type Props = {
   onSuccess?: () => void;
 };
 
-export default function ApproveModal({ open, onClose, bookingId, defaultLink, onSuccess }: Props) {
+export default function ApproveModal({
+  open,
+  onClose,
+  bookingId,
+  defaultLink,
+  onSuccess,
+}: Props) {
   const [link, setLink] = useState(defaultLink || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // keep input in sync if parent updates defaultLink
+  // keep input in sync if parent sends a different default
   useEffect(() => {
-    if (open) setLink(defaultLink || "");
-  }, [open, defaultLink]);
+    setLink(defaultLink || "");
+  }, [defaultLink]);
 
   if (!open) return null;
 
-  async function submit() {
+  const submit = async () => {
     setError(null);
 
-    // quick URL validation
+    // Validate the link
     try {
       const u = new URL(link);
-      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
+      if (!/^https?:/.test(u.protocol)) throw new Error();
     } catch {
-      setError("Please enter a valid URL (must start with http:// or https://).");
+      setError("Please enter a valid URL (must start with https://)");
       return;
     }
 
@@ -42,34 +46,40 @@ export default function ApproveModal({ open, onClose, bookingId, defaultLink, on
         body: JSON.stringify({ bookingId, paymentLink: link }),
       });
 
-      // read body safely (may not always be JSON)
-      const raw = await resp.text();
-      let json: any = null;
-      try { json = JSON.parse(raw); } catch {}
-
-      if (!resp.ok || (json && json.ok === false)) {
-        setError(json?.error || `HTTP ${resp.status}: ${raw || "Unknown error"}`);
-        setLoading(false);
-        return;
+      let message = "";
+      try {
+        const json = await resp.json();
+        if (!resp.ok || !json?.ok) {
+          message = json?.error || "";
+        } else {
+          onClose();
+          onSuccess?.();
+          return;
+        }
+      } catch {
+        // non-JSON fallback
       }
 
-      // success
-      onClose();
-      onSuccess?.();
-    } catch (e: any) {
-      setError(e?.message || "Network error while approving booking.");
+      setError(
+        message ||
+          `HTTP ${resp.status}: ${resp.statusText || "Unknown error"}`
+      );
+    } catch (err: any) {
+      console.error(err);
+      setError("Network error while approving booking.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <div style={backdrop}>
       <div style={card}>
         <h3 style={{ margin: "0 0 10px" }}>Approve & Send Payment Link</h3>
         <p style={{ marginTop: 0, color: "#9ca3af", fontSize: 14 }}>
-          Paste the QuickBooks payment link below. Once submitted, the customer will automatically receive an email
-          with this link to complete their rental payment.
+          Paste the QuickBooks payment link below. Once submitted, the customer
+          will automatically receive an email with this link to complete their
+          rental payment.
         </p>
 
         <input
@@ -80,10 +90,18 @@ export default function ApproveModal({ open, onClose, bookingId, defaultLink, on
           autoFocus
         />
 
-        {error && <div style={{ color: "#f87171", fontSize: 13, marginTop: 6 }}>{error}</div>}
+        {error && (
+          <div style={{ color: "#f87171", fontSize: 13, marginTop: 6 }}>
+            {error}
+          </div>
+        )}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={btnGhost} disabled={loading}>Cancel</button>
+        <div
+          style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}
+        >
+          <button onClick={onClose} style={btnGhost}>
+            Cancel
+          </button>
           <button onClick={submit} disabled={loading} style={btnPrimary}>
             {loading ? "Sending..." : "Approve & Send"}
           </button>
