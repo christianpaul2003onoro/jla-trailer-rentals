@@ -1,4 +1,6 @@
-import { useState } from "react";
+// components/ApproveModal.tsx
+
+import { useEffect, useState } from "react";
 
 type Props = {
   open: boolean;
@@ -13,49 +15,53 @@ export default function ApproveModal({ open, onClose, bookingId, defaultLink, on
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // keep input in sync if parent updates defaultLink
+  useEffect(() => {
+    if (open) setLink(defaultLink || "");
+  }, [open, defaultLink]);
+
   if (!open) return null;
 
-  // Called when admin submits QuickBooks link
-  const submit = async () => {
+  async function submit() {
     setError(null);
 
-    // Validate the link
+    // quick URL validation
     try {
       const u = new URL(link);
-      if (!/^https?:/.test(u.protocol)) throw new Error();
+      if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
     } catch {
-      setError("Please enter a valid URL (must start with https://)");
+      setError("Please enter a valid URL (must start with http:// or https://).");
       return;
     }
 
     setLoading(true);
     try {
-      // Send link + bookingId to the API
       const resp = await fetch("/api/admin/bookings/approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookingId,
-          paymentLink: link,
-        }),
+        body: JSON.stringify({ bookingId, paymentLink: link }),
       });
 
-      const json = await resp.json();
-      if (!resp.ok || !json.ok) {
-        setError(json?.error || "Failed to approve booking.");
+      // read body safely (may not always be JSON)
+      const raw = await resp.text();
+      let json: any = null;
+      try { json = JSON.parse(raw); } catch {}
+
+      if (!resp.ok || (json && json.ok === false)) {
+        setError(json?.error || `HTTP ${resp.status}: ${raw || "Unknown error"}`);
+        setLoading(false);
         return;
       }
 
-      // Successfully approved — close modal + refresh parent list
+      // success
       onClose();
       onSuccess?.();
-    } catch (err: any) {
-      console.error(err);
-      setError("Network error while approving booking.");
+    } catch (e: any) {
+      setError(e?.message || "Network error while approving booking.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
     <div style={backdrop}>
@@ -66,7 +72,6 @@ export default function ApproveModal({ open, onClose, bookingId, defaultLink, on
           with this link to complete their rental payment.
         </p>
 
-        {/* Input for QuickBooks payment link */}
         <input
           value={link}
           onChange={(e) => setLink(e.target.value)}
@@ -78,9 +83,7 @@ export default function ApproveModal({ open, onClose, bookingId, defaultLink, on
         {error && <div style={{ color: "#f87171", fontSize: 13, marginTop: 6 }}>{error}</div>}
 
         <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={btnGhost}>
-            Cancel
-          </button>
+          <button onClick={onClose} style={btnGhost} disabled={loading}>Cancel</button>
           <button onClick={submit} disabled={loading} style={btnPrimary}>
             {loading ? "Sending..." : "Approve & Send"}
           </button>
