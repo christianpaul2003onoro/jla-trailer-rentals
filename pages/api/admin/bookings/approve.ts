@@ -9,7 +9,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY as string; // server-side only
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 const FROM_EMAIL =
-  process.env.EMAIL_FROM || "JLA Trailer Rentals <noreply@send.jlatrailers.com>";
+  process.env.EMAIL_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
   auth: { persistSession: false },
@@ -19,7 +19,7 @@ const resend = new Resend(RESEND_API_KEY);
 /** ---------- HELPERS ---------- */
 type MaybeArr<T> = T | T[] | null | undefined;
 const first = <T,>(v: MaybeArr<T>): T | undefined =>
-  (Array.isArray(v) ? v[0] : (v ?? undefined));
+  Array.isArray(v) ? v[0] : (v ?? undefined);
 
 function bad(res: NextApiResponse, status: number, message: string) {
   return res.status(status).json({ ok: false, error: message });
@@ -52,8 +52,8 @@ function paymentEmailHTML(params: {
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
     <p>${greet}</p>
     <p>Your booking <strong>${rentalId}</strong>${
-      trailerName ? ` for <strong>${trailerName}</strong>` : ""
-    }${
+    trailerName ? ` for <strong>${trailerName}</strong>` : ""
+  }${
     startDate && endDate
       ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>`
       : ""
@@ -68,16 +68,25 @@ function paymentEmailHTML(params: {
 
 /** ---------- HANDLER ---------- */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "POST") return bad(res, 405, "Method not allowed");
+  // Helpful server-side log (shows in Vercel logs)
+  console.log("[approve] method:", req.method);
 
-  // 🔒 admin session required
+  // Some browsers/tools may probe OPTIONS; answer cleanly
+  if (req.method === "OPTIONS") {
+    res.setHeader("Allow", "POST, OPTIONS");
+    return res.status(200).end();
+  }
+
+  // 🔒 admin session required (returns 401 JSON if invalid)
   if (!requireAdmin(req, res)) return;
 
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST, OPTIONS");
+    return bad(res, 405, "Method not allowed");
+  }
+
   // Expect: { bookingId: string, paymentLink: string }
-  const { bookingId, paymentLink } = (req.body ?? {}) as {
-    bookingId?: string;
-    paymentLink?: string;
-  };
+  const { bookingId, paymentLink } = req.body || {};
   if (!bookingId) return bad(res, 400, "Missing bookingId");
   if (!paymentLink || !isHttpUrl(paymentLink))
     return bad(res, 400, "Invalid paymentLink (must be http/https)");
@@ -85,17 +94,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE)
     return bad(res, 500, "Supabase server keys not configured");
   if (!RESEND_API_KEY) return bad(res, 500, "RESEND_API_KEY not configured");
-  if (!FROM_EMAIL) return bad(res, 500, "EMAIL_FROM not configured");
 
   // 1) Fetch booking + client + trailer
   const { data: booking, error: fetchErr } = await supabase
     .from("bookings")
-    .select(`
+    .select(
+      `
       id, rental_id, status, start_date, end_date,
       payment_link, payment_link_sent_at, approved_at,
       clients:clients ( email, first_name ),
       trailers:trailers ( name )
-    `)
+    `
+    )
     .eq("id", bookingId)
     .single();
 
@@ -120,40 +130,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       payment_link_sent_at: nowISO,
     })
     .eq("id", bookingId)
-    .select(`
+    .select(
+      `
       id, rental_id, status, start_date, end_date, payment_link, payment_link_sent_at, approved_at,
       clients:clients ( email, first_name ),
       trailers:trailers ( name )
-    `)
+    `
+    )
     .single();
 
   if (updErr || !updated) return bad(res, 500, "Failed to update booking");
 
-  // 3) Send email (don’t fail whole request if email send fails)
+  const updatedClient = first<{ email?: string; first_name?: string }>(
+    updated.clients as any
+  );
+  const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
+
+  // 3) Send email
   const subject = `Payment link for your rental ${updated.rental_id}`;
   const html = paymentEmailHTML({
-    firstName: clientRec?.first_name,
+    firstName: updatedClient?.first_name,
     rentalId: updated.rental_id,
-    trailerName: trailerRec?.name,
+    trailerName: updatedTrailer?.name,
     startDate: updated.start_date,
     endDate: updated.end_date,
     paymentLink,
   });
 
   try {
-    await resend.emails.send({
-      from: FROM_EMAIL,
-      to: customerEmail,
-      subject,
-      html,
-    });
-    return ok(res, { row: updated, emailSent: true });
+    await resend.emails.send({ from: FROM_EMAIL, to: customerEmail, subject, html });
   } catch (e: any) {
-    console.error("Resend error:", e?.message || e);
-    return ok(res, {
-      row: updated,
-      emailSent: false,
-      emailError: e?.message || "Failed to send email",
-    });
+    console.error("[resend] error:", e?.message);
+    // Still return success with the updated row; UI can show a warning if email failed
+    return ok(res, { row: updated, emailSent: false, emailError: e?.message || "Failed to send email" });
   }
+
+  return ok(res, { row: updated, emailSent: true });
 }
