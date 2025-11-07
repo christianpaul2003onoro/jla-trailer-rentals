@@ -5,10 +5,7 @@ import { requireAdmin } from "../../../../server/adminauth";
 
 type Out = { ok: true; rows: any[] } | { ok: false; error: string };
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<Out>
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse<Out>) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ ok: false, error: "Method not allowed" });
@@ -18,8 +15,7 @@ export default async function handler(
 
   const { data, error } = await supabaseAdmin
     .from("bookings")
-    .select(
-      `
+    .select(`
       id,
       rental_id,
       status,
@@ -27,15 +23,12 @@ export default async function handler(
       start_date,
       end_date,
       delivery_requested,
-      trailer_id,                 -- ✅ needed for availability checks
+      trailer_id,
       clients:clients ( first_name, last_name, email ),
       trailers:trailers ( name )
-    `
-    )
+    `)
     .order("created_at", { ascending: false });
 
-  if (error)
-    return res.status(500).json({ ok: false, error: error.message });
-
+  if (error) return res.status(500).json({ ok: false, error: error.message });
   return res.status(200).json({ ok: true, rows: data || [] });
 }
