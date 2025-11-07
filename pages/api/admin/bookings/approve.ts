@@ -1,14 +1,21 @@
+// pages/api/admin/bookings/approve.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdmin } from "../../../../server/adminauth";
 
 /** ---------- ENV + CLIENTS ---------- */
+// Match your Vercel env names exactly.
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE as string; // <— this one
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 const FROM_EMAIL =
-  process.env.EMAIL_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+  process.env.RESEND_FROM || // <— your var on Vercel
+  "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+
+if (!SUPABASE_URL) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+if (!SUPABASE_SERVICE_ROLE) throw new Error("Missing SUPABASE_SERVICE_ROLE");
+if (!RESEND_API_KEY) throw new Error("Missing RESEND_API_KEY");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
   auth: { persistSession: false },
@@ -49,8 +56,8 @@ function paymentEmailHTML(params: {
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
     <p>${greet}</p>
     <p>Your booking <strong>${rentalId}</strong>${
-      trailerName ? ` for <strong>${trailerName}</strong>` : ""
-    }${
+    trailerName ? ` for <strong>${trailerName}</strong>` : ""
+  }${
     startDate && endDate
       ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>`
       : ""
@@ -64,37 +71,30 @@ function paymentEmailHTML(params: {
 }
 
 /** ---------- HANDLER ---------- */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Diagnostics: see what method is actually arriving in prod
-  console.log("[approve] method:", req.method);
-
-  // Handle OPTIONS cleanly (just in case a preflight happens)
-  if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    return res.status(204).end();
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // Only POST is allowed for this route.
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return bad(res, 405, "Method not allowed");
   }
 
-  // Tiny GET probe so we can open the URL in the browser and confirm the route is deployed
-  if (req.method === "GET") {
-    return ok(res, { route: "approve", method: "GET" });
-  }
-
-  if (req.method !== "POST") return bad(res, 405, "Method not allowed");
-
-  // 🔒 admin cookie required
+  // Require admin cookie session
   if (!requireAdmin(req, res)) return;
 
-  const { bookingId, paymentLink } = req.body || {};
+  // Expect: { bookingId, paymentLink }
+  const { bookingId, paymentLink } = (req.body ?? {}) as {
+    bookingId?: string;
+    paymentLink?: string;
+  };
+
   if (!bookingId) return bad(res, 400, "Missing bookingId");
   if (!paymentLink || !isHttpUrl(paymentLink))
     return bad(res, 400, "Invalid paymentLink (must be http/https)");
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE)
-    return bad(res, 500, "Supabase server keys not configured");
-  if (!RESEND_API_KEY) return bad(res, 500, "RESEND_API_KEY not configured");
-
-  // 1) Fetch booking + relations
+  // 1) Fetch booking + client + trailer
   const { data: booking, error: fetchErr } = await supabase
     .from("bookings")
     .select(
@@ -118,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const customerEmail = clientRec?.email;
   if (!customerEmail) return bad(res, 400, "Booking has no customer email");
 
-  // 2) Update status + store link
+  // 2) Update → Approved + link + timestamps
   const nowISO = new Date().toISOString();
   const { data: updated, error: updErr } = await supabase
     .from("bookings")
@@ -145,7 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   );
   const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
 
-  // 3) Email via Resend
+  // 3) Send email via Resend
   const subject = `Payment link for your rental ${updated.rental_id}`;
   const html = paymentEmailHTML({
     firstName: updatedClient?.first_name,
@@ -159,7 +159,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
-      to: customerEmail!,
+      to: customerEmail,
       subject,
       html,
     });
