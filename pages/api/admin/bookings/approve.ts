@@ -1,4 +1,3 @@
-// pages/api/admin/bookings/approve.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
@@ -21,12 +20,11 @@ type MaybeArr<T> = T | T[] | null | undefined;
 const first = <T,>(v: MaybeArr<T>): T | undefined =>
   Array.isArray(v) ? v[0] : (v ?? undefined);
 
-function bad(res: NextApiResponse, status: number, message: string) {
-  return res.status(status).json({ ok: false, error: message });
-}
-function ok(res: NextApiResponse, data: any) {
-  return res.status(200).json({ ok: true, ...data });
-}
+const bad = (res: NextApiResponse, status: number, message: string) =>
+  res.status(status).json({ ok: false, error: message });
+const ok = (res: NextApiResponse, data: any) =>
+  res.status(200).json({ ok: true, ...data });
+
 function isHttpUrl(s: string) {
   try {
     const u = new URL(s);
@@ -67,21 +65,24 @@ function paymentEmailHTML(params: {
 
 /** ---------- HANDLER ---------- */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Log what’s actually arriving in prod
+  // Diagnostics: see what method is actually arriving in prod
   console.log("[approve] method:", req.method);
 
-  // Allow OPTIONS preflight cleanly (harmless even if it never occurs)
+  // Handle OPTIONS cleanly (just in case a preflight happens)
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     return res.status(204).end();
   }
 
-  if (req.method !== "POST") {
-    return bad(res, 405, "Method not allowed");
+  // Tiny GET probe so we can open the URL in the browser and confirm the route is deployed
+  if (req.method === "GET") {
+    return ok(res, { route: "approve", method: "GET" });
   }
 
-  // 🔒 admin session
+  if (req.method !== "POST") return bad(res, 405, "Method not allowed");
+
+  // 🔒 admin cookie required
   if (!requireAdmin(req, res)) return;
 
   const { bookingId, paymentLink } = req.body || {};
@@ -144,7 +145,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   );
   const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
 
-  // 3) Send email via Resend
+  // 3) Email via Resend
   const subject = `Payment link for your rental ${updated.rental_id}`;
   const html = paymentEmailHTML({
     firstName: updatedClient?.first_name,
@@ -158,7 +159,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
-      to: customerEmail,
+      to: customerEmail!,
       subject,
       html,
     });
