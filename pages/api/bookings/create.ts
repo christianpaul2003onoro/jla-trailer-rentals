@@ -100,11 +100,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return bad(res, 500, insErr?.message || "Insert failed");
   }
 
-  // Optional event log (best-effort)
-  await supabaseAdmin
-    .from("booking_events")
-    .insert({ booking_id: booking.id, kind: "created", details: { delivery_requested } })
-    .catch(() => {});
+  // Optional event log (best-effort) — wrapped in try/catch for type-safety
+  try {
+    await supabaseAdmin
+      .from("booking_events")
+      .insert({ booking_id: booking.id, kind: "created", details: { delivery_requested } });
+  } catch {
+    // ignore logging errors
+  }
 
   const client = pickFirst<{ email?: string; first_name?: string }>(booking.clients);
   const trailer = pickFirst<{ name?: string }>(booking.trailers);
@@ -148,7 +151,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     booking,
     emailSent,
     emailError,
-    // small debug block you can read in DevTools → Network → Response
     debug: { hasKey: !!RESEND_API_KEY, from: FROM_EMAIL },
   });
 }
