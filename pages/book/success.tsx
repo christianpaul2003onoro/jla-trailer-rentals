@@ -50,31 +50,41 @@ export default function BookingSuccess() {
 
   // 2) Fire-and-forget confirmation email AFTER success page is shown
   useEffect(() => {
-    const rid = creds.rental?.trim();
-    if (!rid || confirmFired.current) return;
+  const rid = creds.rental?.trim();
+  if (!rid || confirmFired.current) return;
 
-    confirmFired.current = true;
-    setConfirmState("sending");
+  confirmFired.current = true;
+  setConfirmState("sending");
 
+  const post = () =>
     fetch("/api/bookings/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rental_id: rid }),
+    });
+
+  const get = () => fetch(`/api/bookings/confirm?rental_id=${encodeURIComponent(rid)}`);
+
+  post()
+    .then(async (r) => {
+      if (r.status === 405) return get(); // fallback
+      return r;
     })
-      .then(async (r) => {
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || j?.ok === false) {
-          setConfirmState("error");
-          console.warn("[success] confirm email failed:", j?.error || r.statusText);
-          return;
-        }
-        setConfirmState(j.sent ? "sent" : "skipped"); // skipped = already sent before (idempotent)
-      })
-      .catch((e) => {
+    .then(async (r) => {
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j?.ok === false) {
         setConfirmState("error");
-        console.warn("[success] confirm email network error:", e?.message || e);
-      });
-  }, [creds.rental]);
+        console.warn("[success] confirm email failed:", j?.error || r.statusText);
+        return;
+      }
+      setConfirmState(j.sent ? "sent" : "skipped");
+    })
+    .catch((e) => {
+      setConfirmState("error");
+      console.warn("[success] confirm email network error:", e?.message || e);
+    });
+}, [creds.rental]);
+
 
   const rental = creds.rental || "";
   const key = creds.key || "";
