@@ -3,37 +3,50 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
-const SUPABASE_URL   = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const SERVICE_ROLE   = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+// ENV (support either var name for the service-role key)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const SERVICE_ROLE =
+  (process.env.SUPABASE_SERVICE_ROLE_KEY as string) ||
+  (process.env.SUPABASE_SERVICE_ROLE as string); // <- your current var
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
-const FROM_EMAIL     = process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+const FROM_EMAIL =
+  process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
-const resend   = new Resend(RESEND_API_KEY);
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
+  auth: { persistSession: false },
+});
+const resend = new Resend(RESEND_API_KEY);
 
 type Out = { ok: true; sent: boolean } | { ok: false; error: string };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<Out>) {
-  // Support POST (JSON body) and GET (?rental_id=...)
-  const m = req.method || "GET";
-  const rental_id =
-    m === "POST" ? (req.body?.rental_id as string | undefined)
-                 : (req.query?.rental_id as string | undefined) || (req.query?.rental as string | undefined);
-
-  if (!rental_id) {
+  // Accept BOTH POST (body) and GET (query) so the success page fallback works.
+  const method = req.method || "GET";
+  if (!["POST", "GET"].includes(method)) {
     res.setHeader("Allow", "GET, POST");
-    return res.status(400).json({ ok: false, error: "Missing rental_id" });
+    return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
   try {
+    const rental_id =
+      method === "POST"
+        ? (req.body?.rental_id as string | undefined)
+        : (req.query?.rental_id as string | undefined);
+
+    if (!rental_id) return res.status(400).json({ ok: false, error: "Missing rental_id" });
+    if (!SUPABASE_URL || !SERVICE_ROLE)
+      return res.status(500).json({ ok: false, error: "Server misconfigured (Supabase key/url)" });
+
+    // Fetch booking and join client + trailer
     const { data: booking, error } = await supabase
       .from("bookings")
-      .select(`
-        id, rental_id, start_date, end_date, delivery_requested,
-        confirmation_sent_at,
+      .select(
+        `
+        id, rental_id, start_date, end_date, delivery_requested, confirmation_sent_at,
         clients:clients ( email, first_name ),
         trailers:trailers ( name )
-      `)
+      `
+      )
       .eq("rental_id", rental_id)
       .single();
 
@@ -41,29 +54,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
     if (booking.confirmation_sent_at) return res.status(200).json({ ok: true, sent: false });
 
-    const client  = Array.isArray(booking.clients) ? booking.clients[0] : booking.clients;
+    const client = Array.isArray(booking.clients) ? booking.clients[0] : booking.clients;
     const trailer = Array.isArray(booking.trailers) ? booking.trailers[0] : booking.trailers;
+
     const toEmail = client?.email as string | undefined;
     if (!toEmail) return res.status(400).json({ ok: false, error: "Booking has no client email" });
-
-    if (!RESEND_API_KEY || !FROM_EMAIL) {
+    if (!RESEND_API_KEY || !FROM_EMAIL)
       return res.status(500).json({ ok: false, error: "Email service not configured" });
-    }
 
     const subject = `We received your booking request (${booking.rental_id})`;
     const html = `
       <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
         <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
-        <p>Thanks for choosing <strong>JLA Trailer Rentals</strong>${trailer?.name ? ` — <strong>${trailer.name}</strong>` : ""}.</p>
+        <p>Thanks for choosing <strong>JLA Trailer Rentals</strong>${
+          trailer?.name ? ` for <strong>${trailer.name}</strong>` : ""
+        }.</p>
         <p>Dates: <strong>${booking.start_date}</strong> → <strong>${booking.end_date}</strong></p>
         <p>${booking.delivery_requested ? "Delivery requested." : "Pickup at our location."}</p>
         <p>We’ll review availability and send a payment link after approval.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
+        <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
       </div>
     `;
 
     await resend.emails.send({ from: FROM_EMAIL, to: toEmail, subject, html });
 
-    await supabase.from("bookings")
+    // Stamp as sent (non-fatal if this fails)
+    await supabase
+      .from("bookings")
       .update({ confirmation_sent_at: new Date().toISOString() })
       .eq("id", booking.id);
 
