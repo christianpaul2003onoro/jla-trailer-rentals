@@ -1,3 +1,4 @@
+// pages/api/admin/bookings/[id].ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
@@ -33,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   try {
     const body = req.body || {};
 
-    // 1) RESCHEDULE FLOW
+    // RESCHEDULE FLOW
     if (body.reschedule_start && body.reschedule_end) {
       const start = String(body.reschedule_start);
       const end = String(body.reschedule_end);
@@ -50,29 +51,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
       if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
 
-      // event log (best effort)
+      // best-effort event log
       try {
         await supabaseAdmin
           .from("booking_events")
           .insert({ booking_id: id, kind: "rescheduled", details: { start, end } });
       } catch {}
 
-      // email (best effort)
+      // best-effort email
       if (sendEmail && resend && FROM_EMAIL) {
-        const got = await getJoinedRow(id);
-        if (!("error" in got)) {
-          const row = got.row;
+        const got2 = await getJoinedRow(id);
+        if (!("error" in got2)) {
+          const row = got2.row;
           const client = Array.isArray(row.clients) ? row.clients[0] : row.clients;
           const trailer = Array.isArray(row.trailers) ? row.trailers[0] : row.trailers;
           const to = client?.email as string | undefined;
 
           if (to) {
+            const trailerLine = trailer?.name
+              ? `Trailer: <strong>${trailer.name}</strong><br/>`
+              : "";
+
             const subject = `Updated dates — ${row.rental_id}`;
             const html = `
               <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
                 <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
                 <p>Your booking with <strong>JLA Trailer Rentals</strong> has been rescheduled.</p>
-                <p>${trailer?.name ? \`Trailer: <strong>\${trailer.name}</strong><br/>\` : ""}
+                <p>${trailerLine}
                    New dates: <strong>${start}</strong> → <strong>${end}</strong></p>
                 <p>If anything looks wrong, reply to this email or call (786) 760-6175.</p>
                 <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
@@ -92,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       return res.status(200).json({ ok: true, row: got.row });
     }
 
-    // 2) CLOSE/CANCEL (keep support if you use it)
+    // CLOSE/CANCEL (if used elsewhere)
     if (body.status === "Closed") {
       const { close_outcome, close_reason } = body;
       const { error: updErr } = await supabaseAdmin
