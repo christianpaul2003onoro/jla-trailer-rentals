@@ -38,11 +38,11 @@ export default function AdminHome() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Close modal
+  // Close modal (no reschedule option here)
   const [closing, setClosing] = useState<null | Row>(null);
   const [outcome, setOutcome] = useState<"completed" | "cancelled">("completed");
   const [reason, setReason] = useState("");
-  const [sendThankYou, setSendThankYou] = useState(true);   // default ON
+  const [sendThankYou, setSendThankYou] = useState(true);     // default ON
   const [sendCancelEmail, setSendCancelEmail] = useState(true); // default ON
 
   // Approve + payment link modal
@@ -71,7 +71,10 @@ export default function AdminHome() {
     }
   }
 
-  useEffect(() => { refreshRows(); }, []);
+  useEffect(() => {
+    refreshRows();
+  }, []);
+
   useEffect(() => {
     const onFocus = () => refreshRows();
     window.addEventListener("focus", onFocus);
@@ -168,6 +171,7 @@ export default function AdminHome() {
     setClosing(row);
     setOutcome(preset);
     setReason("");
+    // defaults ON for both flows
     setSendThankYou(true);
     setSendCancelEmail(true);
   }
@@ -191,6 +195,25 @@ export default function AdminHome() {
   async function finalizeClose() {
     if (!closing) return;
 
+    // Build a confirmation summary
+    const who =
+      (closing.clients?.first_name || closing.clients?.last_name)
+        ? `${closing.clients?.first_name ?? ""} ${closing.clients?.last_name ?? ""}`.trim()
+        : "customer";
+    const email = closing.clients?.email ?? "no-email";
+
+    const emailNote =
+      outcome === "completed"
+        ? (sendThankYou ? "A Thank-you email (with review link) WILL be sent." : "No email will be sent.")
+        : (sendCancelEmail ? "A Cancellation email WILL be sent." : "No email will be sent.");
+
+    const ok = window.confirm(
+      `Close booking ${closing.rental_id} as ${outcome === "completed" ? "Finished" : "Cancelled"}?\n\n` +
+      `Customer: ${who} <${email}>\n` +
+      `${emailNote}\n\nPress OK to confirm or Cancel to abort.`
+    );
+    if (!ok) return;
+
     const body: Record<string, any> = {
       status: "Closed",
       close_outcome: outcome,
@@ -199,11 +222,11 @@ export default function AdminHome() {
       send_cancel_email: outcome === "cancelled" ? !!sendCancelEmail : false,
     };
 
-    const ok = await patchStatus(closing.id, body);
-    if (ok) {
-      alert(outcome === "completed" ? "Booking closed as Finished." : "Booking closed as Cancelled.");
+    const done = await patchStatus(closing.id, body);
+    if (done) {
       setRows((p) => p.map((r) => (r.id === closing.id ? { ...r, status: "Closed" } : r)));
       setClosing(null);
+      alert(`Booking ${closing.rental_id} closed as ${outcome}.`);
     }
   }
 
@@ -359,9 +382,7 @@ export default function AdminHome() {
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
               <button style={btn} onClick={() => setClosing(null)}>Cancel</button>
-              <button style={btn} onClick={finalizeClose}>
-                Close Booking
-              </button>
+              <button style={btn} onClick={finalizeClose}>Close Booking</button>
             </div>
           </div>
         </div>
@@ -388,4 +409,4 @@ const backdrop: React.CSSProperties = { position: "fixed", inset: 0, background:
 const modal: React.CSSProperties = { background: "#141416", border: "1px solid #222", borderRadius: 12, padding: 16, width: 560, maxWidth: "92vw" };
 const radioRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
 const checkRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginTop: 12 };
-const ta: React.CSSProperties = { padding: 10, borderRadius: 8, background: "#0b1220", color: "#eaeaea", border: "1px solid #1f2937", minHeight: 72 };
+const ta: React.CSSProperties = { padding: 10, borderRadius: 8, background: "#0b1220", color: "#eaeaea", border: "1px solid #1f2937" };
