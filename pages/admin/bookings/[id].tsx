@@ -150,47 +150,45 @@ export default function BookingDetails() {
   }, [row]);
 
   async function applyReschedule() {
-    if (!row) return;
-    setSuccessMsg(null);
-    setErr(null);
+  if (!row) return;
+  setSuccessMsg(null);
+  setErr(null);
 
-    if (!start || !end) return setErr("Please select both start and end dates.");
-    if (invalidOrder) return setErr("Start date must be <= end date.");
-    if (spanMismatch) return setErr(`Keep the same duration (${requiredSpan!} day${requiredSpan === 1 ? "" : "s"}).`);
-    if (available === false) return setErr("Selected dates conflict with existing bookings.");
+  if (!start || !end) return setErr("Please select both start and end dates.");
+  if (new Date(start) > new Date(end)) return setErr("Start date must be <= end date.");
+  if (spanMismatch) return setErr(`Keep the same duration (${requiredSpan!} day${requiredSpan === 1 ? "" : "s"}).`);
+  if (available === false) return setErr("Selected dates conflict with existing bookings.");
 
-    // confirm
-    const ok = window.confirm(
-      `Reschedule ${row.rental_id} to:\n  ${start} → ${end}\n\nNotify the customer by email and return to Bookings?`
-    );
-    if (!ok) return;
+  const ok = window.confirm(
+    `Reschedule ${row.rental_id} to:\n  ${start} → ${end}\n\nNotify the customer by email and return to Bookings?`
+  );
+  if (!ok) return;
 
-    setSending(true);
-    try {
-      const resp = await fetch(`/api/admin/bookings/${row.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reschedule_start: start,
-          reschedule_end: end,
-          send_reschedule_email: true,   // ensure email is sent
-        }),
-      });
-      const json = await resp.json();
-      if (!resp.ok || !json?.ok) return setErr(json?.error || "Failed to reschedule.");
+  setSending(true);
+  try {
+    const resp = await fetch(`/api/admin/bookings/${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reschedule_start: start,
+        reschedule_end: end,
+        send_reschedule_email: true,
+      }),
+    });
+    const json = await resp.json();
+    if (!resp.ok || !json?.ok) return setErr(json?.error || "Failed to reschedule.");
 
-      // Optional local state update (not really needed since we navigate)
-      setRow(json.row);
-      setSuccessMsg("Rescheduled and customer notified.");
-
-      // Go back to list
-      router.push("/admin");
-    } catch (e: any) {
-      setErr(e?.message || "Network error.");
-    } finally {
-      setSending(false);
-    }
+    // Optional flash + redirect
+    setSuccessMsg("Rescheduled and customer notified.");
+    // ensure navigation even if the fetch for /admin kicks off quickly
+    setTimeout(() => { window.location.href = "/admin"; }, 150);
+  } catch (e: any) {
+    setErr(e?.message || "Network error.");
+  } finally {
+    setSending(false);
   }
+}
+
 
   return (
     <AdminLayout>
