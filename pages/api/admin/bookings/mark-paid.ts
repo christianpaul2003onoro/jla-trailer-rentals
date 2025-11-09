@@ -9,7 +9,9 @@ const FROM_EMAIL =
   process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-type Out = { ok: true } | { ok: false; error: string };
+type Out =
+  | { ok: true; emailed: boolean }
+  | { ok: false; error: string };
 
 export default async function handler(
   req: NextApiRequest,
@@ -23,9 +25,7 @@ export default async function handler(
 
   try {
     const { rental_id } = req.body || {};
-    if (!rental_id) {
-      return res.status(400).json({ ok: false, error: "Missing rental_id" });
-    }
+    if (!rental_id) return res.status(400).json({ ok: false, error: "Missing rental_id" });
 
     // Fetch booking + client + trailer
     const { data: b, error } = await supabaseAdmin
@@ -38,9 +38,7 @@ export default async function handler(
       .eq("rental_id", rental_id)
       .single();
 
-    if (error || !b) {
-      return res.status(404).json({ ok: false, error: "Booking not found" });
-    }
+    if (error || !b) return res.status(404).json({ ok: false, error: "Booking not found" });
 
     // Update status → Paid
     const { error: updErr } = await supabaseAdmin
@@ -48,18 +46,17 @@ export default async function handler(
       .update({ status: "Paid", paid_at: new Date().toISOString() })
       .eq("id", b.id);
 
-    if (updErr) {
-      return res.status(500).json({ ok: false, error: updErr.message });
-    }
+    if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
 
-    // Best-effort event log (ignore errors)
+    // Best-effort event log
     try {
       await supabaseAdmin
         .from("booking_events")
         .insert({ booking_id: b.id, kind: "paid", details: { rental_id } });
-    } catch {}
+    } catch { /* ignore */ }
 
     // Best-effort email receipt
+    let emailed = false;
     const client = Array.isArray(b.clients) ? b.clients[0] : b.clients;
     const trailer = Array.isArray(b.trailers) ? b.trailers[0] : b.trailers;
     const to = client?.email as string | undefined;
@@ -79,11 +76,12 @@ export default async function handler(
         </div>
       `;
       try {
-        await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
-      } catch {}
+        const resp = await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
+        emailed = !!resp?.id;
+      } catch { /* ignore */ }
     }
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, emailed });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message || "Server error" });
   }
