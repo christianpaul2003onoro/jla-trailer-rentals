@@ -53,7 +53,9 @@ export default async function handler(
       await supabaseAdmin
         .from("booking_events")
         .insert({ booking_id: b.id, kind: "paid", details: { rental_id } });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     // Best-effort email receipt
     let emailed = false;
@@ -77,8 +79,11 @@ export default async function handler(
       `;
       try {
         const resp = await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
-        emailed = !!resp?.id;
-      } catch { /* ignore */ }
+        // FIX: Resend returns { data, error }, so ID is at resp.data?.id
+        emailed = !!resp?.data?.id;
+      } catch {
+        /* ignore */
+      }
     }
 
     return res.status(200).json({ ok: true, emailed });
