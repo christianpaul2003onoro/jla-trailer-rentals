@@ -12,11 +12,14 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
 const FROM_EMAIL =
   process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 const REVIEW_URL =
-  process.env.REVIEW_URL || "https://g.page/r/YOUR_PUBLIC_REVIEW_LINK"; // <-- set in env when you have it
+  process.env.REVIEW_URL || "https://g.page/r/YOUR_PUBLIC_REVIEW_LINK";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
+// Explicit union type for the helper result
+type JoinedRow = { row: any } | { error: string };
+
 // helper to fetch one joined row (safe for UI to use after updates)
-async function getJoinedRow(id: string) {
+async function getJoinedRow(id: string): Promise<JoinedRow> {
   const { data, error } = await supabaseAdmin
     .from("bookings")
     .select(
@@ -28,7 +31,7 @@ async function getJoinedRow(id: string) {
     )
     .eq("id", id)
     .single();
-  if (error || !data) return { error: error?.message || "Not found" };
+  if (error || !data) return { error: error?.message ?? "Not found" };
   return { row: data };
 }
 
@@ -50,7 +53,7 @@ export default async function handler(
     try {
       const body = req.body || {};
 
-      // RESCHEDULE (already implemented earlier)
+      // RESCHEDULE
       if (body.reschedule_start && body.reschedule_end) {
         const { data: updated, error: updErr } = await supabaseAdmin
           .from("bookings")
