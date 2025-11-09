@@ -15,21 +15,21 @@ type Row = {
   end_date: string;
   delivery_requested: boolean;
   created_at: string;
-  approved_at?: string | null;
   paid_at?: string | null;
   payment_link?: string | null;
-  payment_link_sent_at?: string | null;
-  close_outcome?: string | null;
-  close_reason?: string | null;
-  trailer_id?: string | null;
   trailers?: { name?: string } | null;
-  clients?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
+  clients?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+  } | null;
 };
 
 export default function AdminHome() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Close modal
   const [closing, setClosing] = useState<null | Row>(null);
   const [outcome, setOutcome] = useState<"completed" | "cancelled" | "reschedule">("completed");
   const [reason, setReason] = useState("");
@@ -37,8 +37,8 @@ export default function AdminHome() {
   const [sendCancelEmail, setSendCancelEmail] = useState(true);
   const [sendRescheduleEmail, setSendRescheduleEmail] = useState(true);
 
+  // Approve + payment link modal
   const [approveFor, setApproveFor] = useState<null | Row>(null);
-  const [markingId, setMarkingId] = useState<string | null>(null);
 
   async function refreshRows() {
     setLoading(true);
@@ -63,7 +63,10 @@ export default function AdminHome() {
     }
   }
 
-  useEffect(() => { refreshRows(); }, []);
+  useEffect(() => {
+    refreshRows();
+  }, []);
+
   useEffect(() => {
     const onFocus = () => refreshRows();
     window.addEventListener("focus", onFocus);
@@ -77,52 +80,77 @@ export default function AdminHome() {
       credentials: "include",
       body: JSON.stringify(body),
     });
+
     if (resp.status === 401) {
       window.location.href = "/admin/login";
       return false;
     }
+
     const json = await resp.json();
+
     if (!resp.ok || json?.ok === false) {
       alert(json?.error || "Could not update status.");
       return false;
     }
+
     if (json?.row) {
       setRows((prev) =>
         prev.map((r) =>
           r.id === id
-            ? { ...r, ...json.row, clients: json.row.clients ?? r.clients, trailers: json.row.trailers ?? r.trailers }
+            ? {
+                ...r,
+                ...json.row,
+                clients: json.row.clients ?? r.clients,
+                trailers: json.row.trailers ?? r.trailers,
+              }
             : r
         )
       );
       return true;
     }
+
     await refreshRows();
     return true;
   }
 
-  async function approve(id: string) {
-    const ok = await patchStatus(id, { status: "Approved" });
-    if (ok) setRows((p) => p.map((r) => (r.id === id ? { ...r, status: "Approved" } : r)));
-  }
+  // Mark Paid with confirmation
+  async function markPaid(row: Row) {
+    const name =
+      (row.clients?.first_name || row.clients?.last_name)
+        ? `${row.clients?.first_name ?? ""} ${row.clients?.last_name ?? ""}`.trim()
+        : "customer";
+    const email = row.clients?.email ?? "no-email";
 
-  async function markPaid(rental_id: string) {
+    const ok = window.confirm(
+      `Confirm marking ${row.rental_id} as Paid and sending a receipt to:\n\n` +
+      `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
+    );
+    if (!ok) return;
+
     try {
-      setMarkingId(rental_id);
-      const r = await fetch("/api/admin/bookings/mark-paid", {
+      const resp = await fetch("/api/admin/bookings/mark-paid", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ rental_id }),
+        body: JSON.stringify({ rental_id: row.rental_id }),
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || j?.ok === false) {
-        alert(j?.error || "Failed to mark paid");
+      const json = await resp.json().catch(() => ({} as any));
+
+      if (!resp.ok || json?.ok === false) {
+        alert(json?.error || "Failed to mark paid.");
         return;
       }
-      await refreshRows();
-      alert(j?.emailed ? "Marked as paid. Receipt email sent." : "Marked as paid. (Email not sent.)");
-    } finally {
-      setMarkingId(null);
+
+      // Optimistically update row
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === row.id ? { ...r, status: "Paid", paid_at: new Date().toISOString() } : r
+        )
+      );
+
+      alert(json.emailed ? "Marked as paid. Receipt email sent." : "Marked as paid.");
+    } catch (e: any) {
+      alert(e?.message || "Network error.");
     }
   }
 
@@ -156,6 +184,7 @@ export default function AdminHome() {
 
   async function finalizeClose() {
     if (!closing) return;
+
     if (outcome === "reschedule") {
       if (sendRescheduleEmail) {
         await patchStatus(closing.id, {
@@ -167,13 +196,16 @@ export default function AdminHome() {
       setClosing(null);
       return;
     }
-    const ok = await patchStatus(closing.id, {
+
+    const body: Record<string, any> = {
       status: "Closed",
       close_outcome: outcome,
       close_reason: reason || null,
       send_thank_you: outcome === "completed" ? !!sendThankYou : false,
       send_cancel_email: outcome === "cancelled" ? !!sendCancelEmail : false,
-    });
+    };
+
+    const ok = await patchStatus(closing.id, body);
     if (ok) {
       setRows((p) => p.map((r) => (r.id === closing.id ? { ...r, status: "Closed" } : r)));
       setClosing(null);
@@ -192,14 +224,7 @@ export default function AdminHome() {
     if (r.status === "Approved") {
       return (
         <div style={actionsWrap}>
-          <button
-            style={btn}
-            onClick={() => markPaid(r.rental_id)}
-            disabled={markingId === r.rental_id}
-            title="Mark as Paid and send receipt"
-          >
-            {markingId === r.rental_id ? "Marking…" : "Mark Paid"}
-          </button>
+          <button style={btn} onClick={() => markPaid(r)}>Mark Paid</button>
           <button style={btn} onClick={() => startReschedule(r)}>Reschedule</button>
           <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>Close</button>
         </div>
@@ -247,6 +272,11 @@ export default function AdminHome() {
                     <div style={{ fontSize: 12, color: "#b8b8b8" }}>
                       Created {new Date(r.created_at).toLocaleString()}
                     </div>
+                    {r.paid_at && (
+                      <div style={{ fontSize: 12, color: "#86efac" }}>
+                        Paid {new Date(r.paid_at).toLocaleString()}
+                      </div>
+                    )}
                   </td>
                   <td style={td}>
                     {(r.clients?.first_name || r.clients?.last_name)
@@ -267,22 +297,70 @@ export default function AdminHome() {
       )}
 
       {closing && (
-        <CloseModal
-          closing={closing}
-          outcome={outcome}
-          reason={reason}
-          sendThankYou={sendThankYou}
-          sendCancelEmail={sendCancelEmail}
-          sendRescheduleEmail={sendRescheduleEmail}
-          setClosing={setClosing}
-          setOutcome={setOutcome}
-          setReason={setReason}
-          setSendThankYou={setSendThankYou}
-          setSendCancelEmail={setSendCancelEmail}
-          setSendRescheduleEmail={setSendRescheduleEmail}
-          finalizeClose={finalizeClose}
-          policyNote={policyNote}
-        />
+        <div style={backdrop}>
+          <div style={modal}>
+            <h3 style={{ margin: "0 0 8px" }}>
+              Close booking <span style={{ color: "#93c5fd" }}>{closing.rental_id}</span>
+            </h3>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              <label style={radioRow}>
+                <input type="radio" checked={outcome === "completed"} onChange={() => setOutcome("completed")} />
+                <span>Finished (business fulfilled)</span>
+              </label>
+              <label style={radioRow}>
+                <input type="radio" checked={outcome === "cancelled"} onChange={() => setOutcome("cancelled")} />
+                <span>Cancelled</span>
+              </label>
+              {outcome === "cancelled" && (
+                <textarea
+                  placeholder="Reason (optional, internal)"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  style={ta}
+                />
+              )}
+              <label style={radioRow}>
+                <input type="radio" checked={outcome === "reschedule"} onChange={() => setOutcome("reschedule")} />
+                <span>Reschedule (no status change now)</span>
+              </label>
+            </div>
+
+            {policyNote && <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: 13 }}>{policyNote}</div>}
+
+            {outcome === "completed" && (
+              <label style={checkRow}>
+                <input type="checkbox" checked={sendThankYou} onChange={(e) => setSendThankYou(e.target.checked)} />
+                <span>Send “Thank you” email</span>
+              </label>
+            )}
+
+            {outcome === "cancelled" && (
+              <label style={checkRow}>
+                <input type="checkbox" checked={sendCancelEmail} onChange={(e) => setSendCancelEmail(e.target.checked)} />
+                <span>Send cancellation email (proof of notice)</span>
+              </label>
+            )}
+
+            {outcome === "reschedule" && (
+              <label style={checkRow}>
+                <input
+                  type="checkbox"
+                  checked={sendRescheduleEmail}
+                  onChange={(e) => setSendRescheduleEmail(e.target.checked)}
+                />
+                <span>Send reschedule confirmation email</span>
+              </label>
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
+              <button style={btn} onClick={() => setClosing(null)}>Cancel</button>
+              <button style={btn} onClick={finalizeClose}>
+                {outcome === "reschedule" ? "Continue" : "Close Booking"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {approveFor && (
@@ -298,80 +376,6 @@ export default function AdminHome() {
   );
 }
 
-/** --- small inline modal (unchanged UI) --- */
-function CloseModal(props: any) {
-  const {
-    closing, outcome, reason, sendThankYou, sendCancelEmail, sendRescheduleEmail,
-    setClosing, setOutcome, setReason, setSendThankYou, setSendCancelEmail, setSendRescheduleEmail,
-    finalizeClose, policyNote
-  } = props;
-  return (
-    <div style={backdrop}>
-      <div style={modal}>
-        <h3 style={{ margin: "0 0 8px" }}>
-          Close booking <span style={{ color: "#93c5fd" }}>{closing.rental_id}</span>
-        </h3>
-
-        <div style={{ display: "grid", gap: 10 }}>
-          <label style={radioRow}>
-            <input type="radio" checked={outcome === "completed"} onChange={() => setOutcome("completed")} />
-            <span>Finished (business fulfilled)</span>
-          </label>
-          <label style={radioRow}>
-            <input type="radio" checked={outcome === "cancelled"} onChange={() => setOutcome("cancelled")} />
-            <span>Cancelled</span>
-          </label>
-          {outcome === "cancelled" && (
-            <textarea
-              placeholder="Reason (optional, internal)"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              style={ta}
-            />
-          )}
-          <label style={radioRow}>
-            <input type="radio" checked={outcome === "reschedule"} onChange={() => setOutcome("reschedule")} />
-            <span>Reschedule (no status change now)</span>
-          </label>
-        </div>
-
-        {policyNote && <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: 13 }}>{policyNote}</div>}
-
-        {outcome === "completed" && (
-          <label style={checkRow}>
-            <input type="checkbox" checked={sendThankYou} onChange={(e) => setSendThankYou(e.target.checked)} />
-            <span>Send “Thank you” email</span>
-          </label>
-        )}
-        {outcome === "cancelled" && (
-          <label style={checkRow}>
-            <input type="checkbox" checked={sendCancelEmail} onChange={(e) => setSendCancelEmail(e.target.checked)} />
-            <span>Send cancellation email (proof of notice)</span>
-          </label>
-        )}
-        {outcome === "reschedule" && (
-          <label style={checkRow}>
-            <input
-              type="checkbox"
-              checked={sendRescheduleEmail}
-              onChange={(e) => setSendRescheduleEmail(e.target.checked)}
-            />
-            <span>Send reschedule confirmation email</span>
-          </label>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-          <button style={btn} onClick={() => setClosing(null)}>Cancel</button>
-          <button style={btn} onClick={finalizeClose}>
-            {outcome === "reschedule" ? "Continue" : "Close Booking"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** styles */
 const th: React.CSSProperties = { padding: "10px 8px", fontSize: 12, color: "#b8b8b8", borderBottom: "1px solid #222" };
 const td: React.CSSProperties = { padding: "12px 8px", verticalAlign: "top" };
 const btn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #333", borderRadius: 8, background: "#141416", color: "#eaeaea", cursor: "pointer" };
