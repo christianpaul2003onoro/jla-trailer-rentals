@@ -1,4 +1,3 @@
-// pages/api/admin/bookings/[id].ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
@@ -24,7 +23,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
   if (req.method === "GET") {
     const got = await getJoinedRow(id);
-    if ("error" in got) return res.status(400).json(got);
+    if ("error" in got) {
+      return res.status(400).json({ ok: false, error: got.error });
+    }
     return res.status(200).json({ ok: true, row: got.row });
   }
 
@@ -38,12 +39,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       const end = String(body.reschedule_end);
       const sendEmail = !!body.send_reschedule_email;
 
-      // guard: start <= end
       if (new Date(start) > new Date(end)) {
         return res.status(400).json({ ok: false, error: "start_date must be <= end_date." });
       }
 
-      // Update dates
       const { error: updErr } = await supabaseAdmin
         .from("bookings")
         .update({ start_date: start, end_date: end })
@@ -51,14 +50,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
       if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
 
-      // best-effort event log
+      // event log (best effort)
       try {
         await supabaseAdmin
           .from("booking_events")
           .insert({ booking_id: id, kind: "rescheduled", details: { start, end } });
       } catch {}
 
-      // Email (best-effort)
+      // email (best effort)
       if (sendEmail && resend && FROM_EMAIL) {
         const got = await getJoinedRow(id);
         if (!("error" in got)) {
@@ -73,7 +72,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
               <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
                 <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
                 <p>Your booking with <strong>JLA Trailer Rentals</strong> has been rescheduled.</p>
-                <p>${trailer?.name ? `Trailer: <strong>${trailer.name}</strong><br/>` : ""}
+                <p>${trailer?.name ? \`Trailer: <strong>\${trailer.name}</strong><br/>\` : ""}
                    New dates: <strong>${start}</strong> → <strong>${end}</strong></p>
                 <p>If anything looks wrong, reply to this email or call (786) 760-6175.</p>
                 <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
@@ -87,19 +86,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         }
       }
 
-      // Return fresh joined row
+      // return fresh row
       const got = await getJoinedRow(id);
-      if ("error" in got) return res.status(200).json({ ok: true }); // still OK but no row
+      if ("error" in got) return res.status(200).json({ ok: true });
       return res.status(200).json({ ok: true, row: got.row });
     }
 
-    // 2) OTHER PATCH ACTIONS (close/cancel/etc.) — keep your existing behavior:
-    // Example:
+    // 2) CLOSE/CANCEL (keep support if you use it)
     if (body.status === "Closed") {
       const { close_outcome, close_reason } = body;
       const { error: updErr } = await supabaseAdmin
         .from("bookings")
-        .update({ status: "Closed", close_outcome: close_outcome ?? null, close_reason: close_reason ?? null })
+        .update({
+          status: "Closed",
+          close_outcome: close_outcome ?? null,
+          close_reason: close_reason ?? null,
+        })
         .eq("id", id);
 
       if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
@@ -109,14 +111,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       return res.status(200).json({ ok: true, row: got.row });
     }
 
-    // 3) No recognized action
     return res.status(400).json({ ok: false, error: "Unsupported PATCH body." });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message || "Server error" });
   }
 }
 
-async function getJoinedRow(id: string): Promise<{ row: any } | { error: string }> {
+async function getJoinedRow(
+  id: string
+): Promise<{ row: any } | { error: string }> {
   const { data, error } = await supabaseAdmin
     .from("bookings")
     .select(`
