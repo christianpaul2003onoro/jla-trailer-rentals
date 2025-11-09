@@ -30,13 +30,11 @@ export default async function handler(
     // Fetch booking + client + trailer
     const { data: b, error } = await supabaseAdmin
       .from("bookings")
-      .select(
-        `
+      .select(`
         id, rental_id, start_date, end_date, paid_at, status,
         clients:clients ( email, first_name ),
         trailers:trailers ( name )
-      `
-      )
+      `)
       .eq("rental_id", rental_id)
       .single();
 
