@@ -13,11 +13,7 @@ type Row = {
   end_date: string;   // ISO
   trailer_id?: string | null;
   trailers?: { name?: string | null } | null;
-  clients?: {
-    first_name?: string | null;
-    last_name?: string | null;
-    email?: string | null;
-  } | null;
+  clients?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
 };
 
 type AvailOK = {
@@ -35,22 +31,12 @@ const card: React.CSSProperties = {
 };
 const rowStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 10 };
 const input: React.CSSProperties = {
-  flex: 1,
-  padding: "10px 12px",
-  borderRadius: 8,
-  border: "1px solid #374151",
-  background: "#0b1220",
-  color: "#e5e7eb",
-  outline: "none",
+  flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid #374151",
+  background: "#0b1220", color: "#e5e7eb", outline: "none",
 };
 const btnPrimary: React.CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 8,
-  border: "1px solid #1e40af",
-  background: "#2563eb",
-  color: "#fff",
-  fontWeight: 700,
-  cursor: "pointer",
+  padding: "10px 14px", borderRadius: 8, border: "1px solid #1e40af",
+  background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer",
 };
 
 const toInputDate = (v?: string | null) => (!v ? "" : v.slice(0, 10));
@@ -71,31 +57,32 @@ export default function BookingDetails() {
   const [sending, setSending] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // availability state (auto-check)
+  // availability state
   const [available, setAvailable] = useState<boolean | null>(null);
   const [availErr, setAvailErr] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<AvailOK["conflicts"]>([]);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // required duration of the booking (must keep the same)
-  const requiredSpan = useMemo(
-    () => (row ? days(toInputDate(row.start_date), toInputDate(row.end_date)) : null),
-    [row]
-  );
+  const requiredSpan = useMemo(() => (row ? days(toInputDate(row.start_date), toInputDate(row.end_date)) : null), [row]);
   const currentSpan = useMemo(() => (start && end ? days(start, end) : null), [start, end]);
   const spanMismatch = useMemo(() => {
     if (requiredSpan === null || currentSpan === null) return false;
     return currentSpan !== requiredSpan;
   }, [requiredSpan, currentSpan]);
 
-  // Load the booking from the admin list (keeps API surface small)
+  const invalidOrder = useMemo(() => {
+    if (!start || !end) return false;
+    return new Date(start) > new Date(end);
+  }, [start, end]);
+
+  // Load one booking from the admin list
   useEffect(() => {
     if (!id) return;
     (async () => {
       setLoading(true);
       setErr(null);
       try {
-        const resp = await fetch("/api/admin/bookings", { credentials: "include" });
+        const resp = await fetch("/api/admin/bookings");
         if (resp.status === 401) {
           window.location.href = "/admin/login";
           return;
@@ -118,9 +105,9 @@ export default function BookingDetails() {
     })();
   }, [id]);
 
-  // Auto-check availability when dates change (debounced)
+  // Auto-check availability on date change (debounced)
   useEffect(() => {
-    if (!row?.trailer_id || !start || !end) return;
+    if (!row?.trailer_id || !start || !end || invalidOrder) return;
     setAvailable(null);
     setAvailErr(null);
     setConflicts([]);
@@ -151,9 +138,9 @@ export default function BookingDetails() {
         setAvailable(null);
         setConflicts([]);
       }
-    }, 400);
+    }, 350);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [row?.trailer_id, start, end]);
+  }, [row?.trailer_id, start, end, invalidOrder]);
 
   const customerName = useMemo(() => {
     if (!row?.clients) return "—";
@@ -168,25 +155,36 @@ export default function BookingDetails() {
     setErr(null);
 
     if (!start || !end) return setErr("Please select both start and end dates.");
-    if (new Date(start) > new Date(end)) return setErr("Start date must be before or equal to end date.");
+    if (invalidOrder) return setErr("Start date must be <= end date.");
     if (spanMismatch) return setErr(`Keep the same duration (${requiredSpan!} day${requiredSpan === 1 ? "" : "s"}).`);
     if (available === false) return setErr("Selected dates conflict with existing bookings.");
+
+    // confirm
+    const ok = window.confirm(
+      `Reschedule ${row.rental_id} to:\n  ${start} → ${end}\n\nNotify the customer by email and return to Bookings?`
+    );
+    if (!ok) return;
 
     setSending(true);
     try {
       const resp = await fetch(`/api/admin/bookings/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reschedule_start: start, reschedule_end: end }),
+        body: JSON.stringify({
+          reschedule_start: start,
+          reschedule_end: end,
+          send_reschedule_email: true,   // ensure email is sent
+        }),
       });
       const json = await resp.json();
       if (!resp.ok || !json?.ok) return setErr(json?.error || "Failed to reschedule.");
 
+      // Optional local state update (not really needed since we navigate)
       setRow(json.row);
-      setStart(toInputDate(json.row?.start_date));
-      setEnd(toInputDate(json.row?.end_date));
-      setAvailable(true);
       setSuccessMsg("Rescheduled and customer notified.");
+
+      // Go back to list
+      router.push("/admin");
     } catch (e: any) {
       setErr(e?.message || "Network error.");
     } finally {
@@ -199,10 +197,7 @@ export default function BookingDetails() {
       <Head><title>Admin • Booking</title></Head>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-        <Link
-          href="/admin"
-          style={{ border: "1px solid #333", borderRadius: 8, padding: "6px 10px", textDecoration: "none", color: "#eaeaea" }}
-        >
+        <Link href="/admin" style={{ border: "1px solid #333", borderRadius: 8, padding: "6px 10px", textDecoration: "none", color: "#eaeaea" }}>
           ← Back
         </Link>
         <h1 style={{ margin: 0, fontSize: 20 }}>Booking</h1>
@@ -214,7 +209,6 @@ export default function BookingDetails() {
 
       {row && (
         <div style={{ display: "grid", gap: 16 }}>
-          {/* Summary */}
           <div style={card}>
             <div style={{ display: "grid", gap: 6 }}>
               <div><strong>Rental ID:</strong> {row.rental_id}</div>
@@ -247,27 +241,25 @@ export default function BookingDetails() {
               </label>
             </div>
 
-            {/* Messages (single, tidy hint) */}
-            <div style={{ marginTop: 8 }}>
-              {spanMismatch ? (
-                <div style={{ color: "#f59e0b" }}>
-                  Must keep the same duration ({requiredSpan} day{requiredSpan === 1 ? "" : "s"}).
-                </div>
-              ) : new Date(start) > new Date(end) ? (
-                <div style={{ color: "#f59e0b" }}>
-                  Start date must be ≤ end date.
-                </div>
-              ) : availErr ? (
-                <div style={{ color: "#f87171" }}>{availErr}</div>
-              ) : available !== null ? (
-                <div style={{ color: available ? "#86efac" : "#f87171" }}>
-                  {available ? "✅ Dates are available." : `❌ Dates conflict with ${conflicts.length} booking(s).`}
-                </div>
-              ) : null}
-
-              {successMsg && <div style={{ color: "#86efac", marginTop: 8 }}>{successMsg}</div>}
-              {err && !loading && <div style={{ color: "#f87171", marginTop: 8 }}>{err}</div>}
-            </div>
+            {/* Messages */}
+            {invalidOrder && (
+              <div style={{ color: "#f87171", marginTop: 8 }}>
+                Start date must be ≤ end date.
+              </div>
+            )}
+            {spanMismatch && (
+              <div style={{ color: "#f59e0b", marginTop: 8 }}>
+                Must keep the same duration ({requiredSpan} day{requiredSpan === 1 ? "" : "s"}).
+              </div>
+            )}
+            {availErr && <div style={{ color: "#f87171", marginTop: 8 }}>{availErr}</div>}
+            {available !== null && !spanMismatch && !invalidOrder && (
+              <div style={{ marginTop: 8, color: available ? "#86efac" : "#f87171" }}>
+                {available ? "✅ Dates are available." : `❌ Dates conflict with ${conflicts.length} booking(s).`}
+              </div>
+            )}
+            {successMsg && <div style={{ color: "#86efac", marginTop: 10 }}>{successMsg}</div>}
+            {err && !loading && <div style={{ color: "#f87171", marginTop: 10 }}>{err}</div>}
 
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               <button
@@ -276,7 +268,7 @@ export default function BookingDetails() {
                   sending ||
                   !start ||
                   !end ||
-                  new Date(start) > new Date(end) ||
+                  invalidOrder ||
                   spanMismatch ||
                   available === false
                 }
