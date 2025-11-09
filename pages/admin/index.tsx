@@ -25,6 +25,15 @@ type Row = {
   } | null;
 };
 
+function fmtLocal(dt?: string | null) {
+  if (!dt) return "";
+  try {
+    return new Date(dt).toLocaleString();
+  } catch {
+    return dt ?? "";
+  }
+}
+
 export default function AdminHome() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,55 +123,50 @@ export default function AdminHome() {
   }
 
   // Mark Paid with confirmation
-  // inside pages/admin/index.tsx
-
-async function markPaid(row: Row) {
-  // safety: no double-submit
-  if (!row?.rental_id) {
-    alert("Missing rental ID.");
-    return;
-  }
-
-  const name =
-    (row.clients?.first_name || row.clients?.last_name)
-      ? `${row.clients?.first_name ?? ""} ${row.clients?.last_name ?? ""}`.trim()
-      : "customer";
-  const email = row.clients?.email ?? "no-email";
-
-  // ✅ native confirm dialog
-  const ok = window.confirm(
-    `Confirm marking ${row.rental_id} as Paid and sending a receipt to:\n\n` +
-    `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
-  );
-  if (!ok) return;
-
-  try {
-    const resp = await fetch("/api/admin/bookings/mark-paid", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ rental_id: row.rental_id }),
-    });
-    const json = await resp.json().catch(() => ({} as any));
-
-    if (!resp.ok || json?.ok === false) {
-      alert(json?.error || "Failed to mark paid.");
+  async function markPaid(row: Row) {
+    if (!row?.rental_id) {
+      alert("Missing rental ID.");
       return;
     }
 
-    // optimistic UI
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id === row.id ? { ...r, status: "Paid", paid_at: new Date().toISOString() } : r
-      )
+    const name =
+      (row.clients?.first_name || row.clients?.last_name)
+        ? `${row.clients?.first_name ?? ""} ${row.clients?.last_name ?? ""}`.trim()
+        : "customer";
+    const email = row.clients?.email ?? "no-email";
+
+    const ok = window.confirm(
+      `Confirm marking ${row.rental_id} as Paid and sending a receipt to:\n\n` +
+      `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
     );
+    if (!ok) return;
 
-    alert(json.emailed ? "Marked as paid. Receipt email sent." : "Marked as paid.");
-  } catch (e: any) {
-    alert(e?.message || "Network error.");
+    try {
+      const resp = await fetch("/api/admin/bookings/mark-paid", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ rental_id: row.rental_id }),
+      });
+      const json = await resp.json().catch(() => ({} as any));
+
+      if (!resp.ok || json?.ok === false) {
+        alert(json?.error || "Failed to mark paid.");
+        return;
+      }
+
+      // optimistic status + timestamp
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === row.id ? { ...r, status: "Paid", paid_at: new Date().toISOString() } : r
+        )
+      );
+
+      alert(json.emailed ? "Marked as paid. Receipt email sent." : "Marked as paid.");
+    } catch (e: any) {
+      alert(e?.message || "Network error.");
+    }
   }
-}
-
 
   function openCloseModal(row: Row, preset: "completed" | "cancelled" | "reschedule") {
     setClosing(row);
@@ -280,13 +284,8 @@ async function markPaid(row: Row) {
                   <td style={td}>
                     <div style={{ fontWeight: 700 }}>{r.rental_id}</div>
                     <div style={{ fontSize: 12, color: "#b8b8b8" }}>
-                      Created {new Date(r.created_at).toLocaleString()}
+                      Created {fmtLocal(r.created_at)}
                     </div>
-                    {r.paid_at && (
-                      <div style={{ fontSize: 12, color: "#86efac" }}>
-                        Paid {new Date(r.paid_at).toLocaleString()}
-                      </div>
-                    )}
                   </td>
                   <td style={td}>
                     {(r.clients?.first_name || r.clients?.last_name)
@@ -297,7 +296,16 @@ async function markPaid(row: Row) {
                   <td style={td}>{r.trailers?.name ?? "—"}</td>
                   <td style={td}>{r.start_date} → {r.end_date}</td>
                   <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
-                  <td style={td}><StatusPill status={r.status} /></td>
+                  <td style={td}>
+                    <div style={{ display: "grid", gap: 4 }}>
+                      <StatusPill status={r.status} />
+                      {r.status === "Paid" && r.paid_at && (
+                        <div style={{ fontSize: 12, color: "#22c55e" }}>
+                          Paid {fmtLocal(r.paid_at)}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td style={td}><Actions r={r} /></td>
                 </tr>
               ))}
