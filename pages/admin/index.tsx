@@ -40,6 +40,9 @@ export default function AdminHome() {
   // modal state (Approve + payment link)
   const [approveFor, setApproveFor] = useState<null | Row>(null);
 
+  // action busy flag (per-row)
+  const [busyId, setBusyId] = useState<string | null>(null);
+
   async function refreshRows() {
     setLoading(true);
     try {
@@ -97,7 +100,7 @@ export default function AdminHome() {
       return false;
     }
 
-    // If API returned a full joined row, merge it safely so nested objects don't flicker to "—"
+    // Merge returned row if present
     if (json?.row) {
       setRows((prev) =>
         prev.map((r) =>
@@ -114,7 +117,7 @@ export default function AdminHome() {
       return true;
     }
 
-    // Some actions (like notify only) don't return a row — refetch so UI stays accurate
+    // If no row returned, refresh list
     await refreshRows();
     return true;
   }
@@ -125,24 +128,51 @@ export default function AdminHome() {
     if (ok) setRows((p) => p.map((r) => (r.id === id ? { ...r, status: "Approved" } : r)));
   }
 
-  async function markPaid(rental_id: string) {
-  const r = await fetch("/api/admin/bookings/mark-paid", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ rental_id }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || j?.ok === false) {
-    alert(j?.error || "Failed to mark paid");
-    return;
+  // MARK PAID — uses PATCH /api/admin/bookings/[id] with { mark_paid: true }
+  async function markPaid(id: string) {
+    if (!id) return;
+    if (!confirm("Mark this booking as paid?")) return;
+
+    try {
+      setBusyId(id);
+      const resp = await fetch(`/api/admin/bookings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ mark_paid: true }),
+      });
+
+      if (resp.status === 401) {
+        window.location.href = "/admin/login";
+        return;
+      }
+
+      const json = await resp.json();
+      if (!resp.ok || json?.ok === false) {
+        throw new Error(json?.error || "Failed to mark paid.");
+      }
+
+      // Merge updated row (status + paid_at + any joins)
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                ...json.row,
+                clients: json.row?.clients ?? r.clients,
+                trailers: json.row?.trailers ?? r.trailers,
+              }
+            : r
+        )
+      );
+
+      alert("Marked as paid. Receipt sent.");
+    } catch (e: any) {
+      alert(e?.message || "Could not mark paid.");
+    } finally {
+      setBusyId(null);
+    }
   }
-  alert("Marked as paid. Receipt sent.");
-  location.reload();
-}
-
-// ...
-<button onClick={() => markPaid(row.rental_id)} className="btn">Mark Paid</button>
-
 
   function openCloseModal(row: Row, preset: "completed" | "cancelled" | "reschedule") {
     setClosing(row);
@@ -214,7 +244,14 @@ export default function AdminHome() {
     if (r.status === "Approved") {
       return (
         <div style={actionsWrap}>
-          <button style={btn} onClick={() => markPaid(r.id)}>Mark Paid</button>
+          <button
+            style={btn}
+            onClick={() => markPaid(r.id)}
+            disabled={busyId === r.id}
+            title={r.paid_at ? `Paid at ${new Date(r.paid_at).toLocaleString()}` : undefined}
+          >
+            {busyId === r.id ? "Marking…" : "Mark Paid"}
+          </button>
           <button style={btn} onClick={() => startReschedule(r)}>Reschedule</button>
           <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>Close</button>
         </div>
@@ -272,7 +309,14 @@ export default function AdminHome() {
                   <td style={td}>{r.trailers?.name ?? "—"}</td>
                   <td style={td}>{r.start_date} → {r.end_date}</td>
                   <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
-                  <td style={td}><StatusPill status={r.status} /></td>
+                  <td style={td}>
+                    <StatusPill status={r.status} />
+                    {r.paid_at && (
+                      <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                        Paid {new Date(r.paid_at).toLocaleString()}
+                      </div>
+                    )}
+                  </td>
                   <td style={td}><Actions r={r} /></td>
                 </tr>
               ))}
