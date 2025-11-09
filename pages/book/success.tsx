@@ -13,7 +13,6 @@ export default function BookingSuccess() {
   const [creds, setCreds] = useState<Creds>({});
   const fired = useRef(false);
 
-  // Collect credentials from URL or storage
   useEffect(() => {
     const qp: Creds = {
       rental: (router.query.rental as string) || (router.query.rid as string) || "",
@@ -22,42 +21,36 @@ export default function BookingSuccess() {
       email: (router.query.email as string) || "",
     };
 
-    if (qp.rental && qp.key) {
-      setCreds(qp);
-      return;
-    }
-
     try {
-      const raw =
-        (typeof window !== "undefined" && sessionStorage.getItem("jla_last_rental")) ||
-        (typeof window !== "undefined" && localStorage.getItem("jla_last_rental"));
-      if (raw) {
-        const stored = JSON.parse(raw) as Creds;
-        setCreds({
-          rental: stored.rental || qp.rental || "",
-          key: stored.key || qp.key || "",
-          name: stored.name || qp.name || "",
-          email: stored.email || qp.email || "",
-        });
-      } else setCreds(qp);
-    } catch {
-      setCreds(qp);
-    }
+      if (!(qp.rental && qp.key)) {
+        const raw =
+          (typeof window !== "undefined" && sessionStorage.getItem("jla_last_rental")) ||
+          (typeof window !== "undefined" && localStorage.getItem("jla_last_rental"));
+        if (raw) {
+          const s = JSON.parse(raw) as Creds;
+          setCreds({
+            rental: s.rental || qp.rental || "",
+            key: s.key || qp.key || "",
+            name: s.name || qp.name || "",
+            email: s.email || qp.email || "",
+          });
+          return;
+        }
+      }
+    } catch {}
+    setCreds(qp);
   }, [router.query]);
 
-  // Fire-and-forget confirmation email quietly
   useEffect(() => {
     const rid = creds.rental?.trim();
     if (!rid || fired.current) return;
     fired.current = true;
-
-    // Try POST first; if a 405 comes back (older Vercel cache), try GET fallback
-    const fallback = () => fetch(`/api/bookings/confirm?rental_id=${encodeURIComponent(rid)}`);
+    // Fire-and-forget, no UI text:
     fetch("/api/bookings/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rental_id: rid }),
-    }).then(r => (r.status === 405 ? fallback() : r)).catch(() => {});
+    }).catch(() => {});
   }, [creds.rental]);
 
   const rental = creds.rental || "";
@@ -84,16 +77,10 @@ export default function BookingSuccess() {
         </div>
 
         <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
-          <Link
-            href={findUrl}
-            style={{ background: "#2563eb", color: "white", padding: "10px 14px", borderRadius: 8, fontWeight: 700 }}
-          >
+          <Link href={findUrl} style={{ background: "#2563eb", color: "white", padding: "10px 14px", borderRadius: 8, fontWeight: 700 }}>
             Open “Find My Rental”
           </Link>
-          <Link
-            href="/fleet"
-            style={{ border: "1px solid #334155", padding: "10px 14px", borderRadius: 8, color: "#e5e7eb" }}
-          >
+          <Link href="/fleet" style={{ border: "1px solid #334155", padding: "10px 14px", borderRadius: 8, color: "#e5e7eb" }}>
             Back to Fleet
           </Link>
         </div>
