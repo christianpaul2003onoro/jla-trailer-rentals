@@ -40,11 +40,10 @@ export default function AdminHome() {
 
   // Close modal
   const [closing, setClosing] = useState<null | Row>(null);
-  const [outcome, setOutcome] = useState<"completed" | "cancelled" | "reschedule">("completed");
+  const [outcome, setOutcome] = useState<"completed" | "cancelled">("completed");
   const [reason, setReason] = useState("");
-  const [sendThankYou, setSendThankYou] = useState(false);
-  const [sendCancelEmail, setSendCancelEmail] = useState(true);
-  const [sendRescheduleEmail, setSendRescheduleEmail] = useState(true);
+  const [sendThankYou, setSendThankYou] = useState(true);   // default ON
+  const [sendCancelEmail, setSendCancelEmail] = useState(true); // default ON
 
   // Approve + payment link modal
   const [approveFor, setApproveFor] = useState<null | Row>(null);
@@ -72,10 +71,7 @@ export default function AdminHome() {
     }
   }
 
-  useEffect(() => {
-    refreshRows();
-  }, []);
-
+  useEffect(() => { refreshRows(); }, []);
   useEffect(() => {
     const onFocus = () => refreshRows();
     window.addEventListener("focus", onFocus);
@@ -168,13 +164,12 @@ export default function AdminHome() {
     }
   }
 
-  function openCloseModal(row: Row, preset: "completed" | "cancelled" | "reschedule") {
+  function openCloseModal(row: Row, preset: "completed" | "cancelled") {
     setClosing(row);
     setOutcome(preset);
     setReason("");
-    setSendThankYou(false);
+    setSendThankYou(true);
     setSendCancelEmail(true);
-    setSendRescheduleEmail(true);
   }
 
   function startReschedule(row: Row) {
@@ -189,27 +184,12 @@ export default function AdminHome() {
       }
       return "No deposit recorded here. Apply policy manually in QuickBooks if one was taken.";
     }
-    if (outcome === "reschedule") {
-      return "Reschedule allowed within 30 days (subject to availability); original deposit honored.";
-    }
     if (outcome === "completed") return "Finish = rental fulfilled. Optional “thank you” email.";
     return "";
   }, [closing, outcome]);
 
   async function finalizeClose() {
     if (!closing) return;
-
-    if (outcome === "reschedule") {
-      if (sendRescheduleEmail) {
-        await patchStatus(closing.id, {
-          reschedule_notify_only: true,
-          send_reschedule_email: true,
-        });
-      }
-      startReschedule(closing);
-      setClosing(null);
-      return;
-    }
 
     const body: Record<string, any> = {
       status: "Closed",
@@ -221,6 +201,7 @@ export default function AdminHome() {
 
     const ok = await patchStatus(closing.id, body);
     if (ok) {
+      alert(outcome === "completed" ? "Booking closed as Finished." : "Booking closed as Cancelled.");
       setRows((p) => p.map((r) => (r.id === closing.id ? { ...r, status: "Closed" } : r)));
       setClosing(null);
     }
@@ -298,10 +279,7 @@ export default function AdminHome() {
                   <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
                   <td style={td}>
                     <div style={{ display: "grid", gap: 4 }}>
-                      {/* keep pill tight to its text */}
-                      <div style={pillWrap}>
-                        <StatusPill status={r.status} />
-                      </div>
+                      <StatusPill status={r.status} />
                       {r.status === "Paid" && r.paid_at && (
                         <div style={{ fontSize: 12, color: "#22c55e" }}>
                           Paid {fmtLocal(r.paid_at)}
@@ -326,13 +304,23 @@ export default function AdminHome() {
 
             <div style={{ display: "grid", gap: 10 }}>
               <label style={radioRow}>
-                <input type="radio" checked={outcome === "completed"} onChange={() => setOutcome("completed")} />
+                <input
+                  type="radio"
+                  checked={outcome === "completed"}
+                  onChange={() => setOutcome("completed")}
+                />
                 <span>Finished (business fulfilled)</span>
               </label>
+
               <label style={radioRow}>
-                <input type="radio" checked={outcome === "cancelled"} onChange={() => setOutcome("cancelled")} />
+                <input
+                  type="radio"
+                  checked={outcome === "cancelled"}
+                  onChange={() => setOutcome("cancelled")}
+                />
                 <span>Cancelled</span>
               </label>
+
               {outcome === "cancelled" && (
                 <textarea
                   placeholder="Reason (optional, internal)"
@@ -341,43 +329,38 @@ export default function AdminHome() {
                   style={ta}
                 />
               )}
-              <label style={radioRow}>
-                <input type="radio" checked={outcome === "reschedule"} onChange={() => setOutcome("reschedule")} />
-                <span>Reschedule (no status change now)</span>
-              </label>
             </div>
 
-            {policyNote && <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: 13 }}>{policyNote}</div>}
+            {policyNote && (
+              <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: 13 }}>{policyNote}</div>
+            )}
 
             {outcome === "completed" && (
               <label style={checkRow}>
-                <input type="checkbox" checked={sendThankYou} onChange={(e) => setSendThankYou(e.target.checked)} />
-                <span>Send “Thank you” email</span>
+                <input
+                  type="checkbox"
+                  checked={sendThankYou}
+                  onChange={(e) => setSendThankYou(e.target.checked)}
+                />
+                <span>Send “Thank you” email (includes review link)</span>
               </label>
             )}
 
             {outcome === "cancelled" && (
               <label style={checkRow}>
-                <input type="checkbox" checked={sendCancelEmail} onChange={(e) => setSendCancelEmail(e.target.checked)} />
-                <span>Send cancellation email (proof of notice)</span>
-              </label>
-            )}
-
-            {outcome === "reschedule" && (
-              <label style={checkRow}>
                 <input
                   type="checkbox"
-                  checked={sendRescheduleEmail}
-                  onChange={(e) => setSendRescheduleEmail(e.target.checked)}
+                  checked={sendCancelEmail}
+                  onChange={(e) => setSendCancelEmail(e.target.checked)}
                 />
-                <span>Send reschedule confirmation email</span>
+                <span>Send cancellation email (proof of notice)</span>
               </label>
             )}
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
               <button style={btn} onClick={() => setClosing(null)}>Cancel</button>
               <button style={btn} onClick={finalizeClose}>
-                {outcome === "reschedule" ? "Continue" : "Close Booking"}
+                Close Booking
               </button>
             </div>
           </div>
@@ -405,11 +388,4 @@ const backdrop: React.CSSProperties = { position: "fixed", inset: 0, background:
 const modal: React.CSSProperties = { background: "#141416", border: "1px solid #222", borderRadius: 12, padding: 16, width: 560, maxWidth: "92vw" };
 const radioRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
 const checkRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginTop: 12 };
-const ta: React.CSSProperties = { padding: 10, borderRadius: 8, background: "#0b1220", color: "#eaeaea", border: "1px solid #1f2937" };
-
-// keeps the StatusPill tight to its text
-const pillWrap: React.CSSProperties = {
-  display: "inline-flex",
-  width: "fit-content",
-  whiteSpace: "nowrap",
-};
+const ta: React.CSSProperties = { padding: 10, borderRadius: 8, background: "#0b1220", color: "#eaeaea", border: "1px solid #1f2937", minHeight: 72 };
