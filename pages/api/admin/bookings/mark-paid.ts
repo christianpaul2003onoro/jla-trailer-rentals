@@ -9,9 +9,7 @@ const FROM_EMAIL =
   process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-type Out =
-  | { ok: true; emailed: boolean }
-  | { ok: false; error: string };
+type Out = { ok: true; emailed: boolean } | { ok: false; error: string };
 
 export default async function handler(
   req: NextApiRequest,
@@ -25,9 +23,11 @@ export default async function handler(
 
   try {
     const { rental_id } = req.body || {};
-    if (!rental_id) return res.status(400).json({ ok: false, error: "Missing rental_id" });
+    if (!rental_id) {
+      return res.status(400).json({ ok: false, error: "Missing rental_id" });
+    }
 
-    // Fetch booking + client + trailer
+    // Get booking + client + trailer
     const { data: b, error } = await supabaseAdmin
       .from("bookings")
       .select(`
@@ -38,15 +38,24 @@ export default async function handler(
       .eq("rental_id", rental_id)
       .single();
 
-    if (error || !b) return res.status(404).json({ ok: false, error: "Booking not found" });
+    if (error || !b) {
+      return res.status(404).json({ ok: false, error: "Booking not found" });
+    }
 
-    // Update status → Paid
+    // IDEMPOTENCY: if already paid, do nothing (no extra email)
+    if (b.paid_at || b.status === "Paid") {
+      return res.status(200).json({ ok: true, emailed: false });
+    }
+
+    // Mark as Paid
     const { error: updErr } = await supabaseAdmin
       .from("bookings")
       .update({ status: "Paid", paid_at: new Date().toISOString() })
       .eq("id", b.id);
 
-    if (updErr) return res.status(500).json({ ok: false, error: updErr.message });
+    if (updErr) {
+      return res.status(500).json({ ok: false, error: updErr.message });
+    }
 
     // Best-effort event log
     try {
@@ -79,7 +88,7 @@ export default async function handler(
       `;
       try {
         const resp = await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
-        // FIX: Resend returns { data, error }, so ID is at resp.data?.id
+        // Resend returns { data, error }
         emailed = !!resp?.data?.id;
       } catch {
         /* ignore */
