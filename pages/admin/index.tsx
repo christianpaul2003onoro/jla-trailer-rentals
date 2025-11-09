@@ -125,11 +125,24 @@ export default function AdminHome() {
     if (ok) setRows((p) => p.map((r) => (r.id === id ? { ...r, status: "Approved" } : r)));
   }
 
-  async function markPaid(id: string) {
-    if (!confirm("Confirm deposit/payment received?")) return;
-    const ok = await patchStatus(id, { mark_paid: true });
-    if (ok) setRows((p) => p.map((r) => (r.id === id ? { ...r, status: "Paid" } : r)));
+  async function markPaid(rental_id: string) {
+  const r = await fetch("/api/admin/bookings/mark-paid", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rental_id }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j?.ok === false) {
+    alert(j?.error || "Failed to mark paid");
+    return;
   }
+  alert("Marked as paid. Receipt sent.");
+  location.reload();
+}
+
+// ...
+<button onClick={() => markPaid(row.rental_id)} className="btn">Mark Paid</button>
+
 
   function openCloseModal(row: Row, preset: "completed" | "cancelled" | "reschedule") {
     setClosing(row);
