@@ -298,7 +298,10 @@ export default function AdminHome() {
                   <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
                   <td style={td}>
                     <div style={{ display: "grid", gap: 4 }}>
-                      <StatusPill status={r.status} />
+                      {/* keep pill tight to its text */}
+                      <div style={pillWrap}>
+                        <StatusPill status={r.status} />
+                      </div>
                       {r.status === "Paid" && r.paid_at && (
                         <div style={{ fontSize: 12, color: "#22c55e" }}>
                           Paid {fmtLocal(r.paid_at)}
@@ -403,3 +406,10 @@ const modal: React.CSSProperties = { background: "#141416", border: "1px solid #
 const radioRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
 const checkRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginTop: 12 };
 const ta: React.CSSProperties = { padding: 10, borderRadius: 8, background: "#0b1220", color: "#eaeaea", border: "1px solid #1f2937" };
+
+// keeps the StatusPill tight to its text
+const pillWrap: React.CSSProperties = {
+  display: "inline-flex",
+  width: "fit-content",
+  whiteSpace: "nowrap",
+};
