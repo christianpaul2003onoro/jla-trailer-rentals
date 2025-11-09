@@ -11,10 +11,9 @@ type Creds = { rental?: string; key?: string; name?: string; email?: string };
 export default function BookingSuccess() {
   const router = useRouter();
   const [creds, setCreds] = useState<Creds>({});
-  const confirmFired = useRef(false); // avoid double POSTs during route hydration
-  const [confirmState, setConfirmState] = useState<"idle" | "sending" | "sent" | "skipped" | "error">("idle");
+  const fired = useRef(false);
 
-  // 1) Collect credentials from query or storage (your original logic, kept intact)
+  // Collect credentials from URL or storage
   useEffect(() => {
     const qp: Creds = {
       rental: (router.query.rental as string) || (router.query.rid as string) || "",
@@ -40,51 +39,26 @@ export default function BookingSuccess() {
           name: stored.name || qp.name || "",
           email: stored.email || qp.email || "",
         });
-      } else {
-        setCreds(qp);
-      }
+      } else setCreds(qp);
     } catch {
       setCreds(qp);
     }
   }, [router.query]);
 
-  // 2) Fire-and-forget confirmation email AFTER success page is shown
+  // Fire-and-forget confirmation email quietly
   useEffect(() => {
-  const rid = creds.rental?.trim();
-  if (!rid || confirmFired.current) return;
+    const rid = creds.rental?.trim();
+    if (!rid || fired.current) return;
+    fired.current = true;
 
-  confirmFired.current = true;
-  setConfirmState("sending");
-
-  const post = () =>
+    // Try POST first; if a 405 comes back (older Vercel cache), try GET fallback
+    const fallback = () => fetch(`/api/bookings/confirm?rental_id=${encodeURIComponent(rid)}`);
     fetch("/api/bookings/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rental_id: rid }),
-    });
-
-  const get = () => fetch(`/api/bookings/confirm?rental_id=${encodeURIComponent(rid)}`);
-
-  post()
-    .then(async (r) => {
-      if (r.status === 405) return get(); // fallback
-      return r;
-    })
-    .then(async (r) => {
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || j?.ok === false) {
-        setConfirmState("error");
-        console.warn("[success] confirm email failed:", j?.error || r.statusText);
-        return;
-      }
-      setConfirmState(j.sent ? "sent" : "skipped");
-    })
-    .catch((e) => {
-      setConfirmState("error");
-      console.warn("[success] confirm email network error:", e?.message || e);
-    });
-}, [creds.rental]);
-
+    }).then(r => (r.status === 405 ? fallback() : r)).catch(() => {});
+  }, [creds.rental]);
 
   const rental = creds.rental || "";
   const key = creds.key || "";
@@ -98,27 +72,10 @@ export default function BookingSuccess() {
       <Nav />
       <main className="container" style={{ maxWidth: 900, margin: "32px auto", padding: "0 16px" }}>
         <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 8 }}>Thanks{ name ? `, ${name}` : "" }!</h1>
-
         <p style={{ color: "#cbd5e1", marginBottom: 16 }}>
           We’ve received your booking! A confirmation email was sent to <strong>{email || "your email"}</strong>{" "}
           with your <strong>Rental ID</strong> and <strong>Access Key</strong>. You’ll hear from us once your request is approved.
         </p>
-
-        {/* (Optional) tiny status note, not required; keep if you want debugging help */}
-        {confirmState === "sending" && (
-          <div style={{ color: "#93c5fd", fontSize: 13, marginBottom: 8 }}>Sending confirmation…</div>
-        )}
-        {confirmState === "sent" && (
-          <div style={{ color: "#86efac", fontSize: 13, marginBottom: 8 }}>Confirmation sent.</div>
-        )}
-        {confirmState === "skipped" && (
-          <div style={{ color: "#a3a3a3", fontSize: 13, marginBottom: 8 }}>Confirmation already sent.</div>
-        )}
-        {confirmState === "error" && (
-          <div style={{ color: "#f87171", fontSize: 13, marginBottom: 8 }}>
-            We couldn’t send the confirmation email automatically.
-          </div>
-        )}
 
         <div style={{ background: "#0b1220", border: "1px solid #1f2937", borderRadius: 10, padding: 16 }}>
           <div style={{ fontWeight: 700, color: "#e5e7eb", marginBottom: 8 }}>Your booking credentials</div>
