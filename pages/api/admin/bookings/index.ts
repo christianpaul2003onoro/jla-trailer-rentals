@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
   if (!requireAdmin(req, res)) return;
 
-  // IMPORTANT: no inline comments inside the select string
+  // IMPORTANT: no comments inside this select string.
   const { data, error } = await supabaseAdmin
     .from("bookings")
     .select(`
@@ -37,9 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     `)
     .order("created_at", { ascending: false });
 
-  if (error) {
-    return res.status(400).json({ ok: false, error: error.message });
-  }
+  if (error) return res.status(400).json({ ok: false, error: error.message });
 
   return res.status(200).json({ ok: true, rows: data ?? [] });
 }
