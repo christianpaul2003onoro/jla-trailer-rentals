@@ -114,45 +114,55 @@ export default function AdminHome() {
   }
 
   // Mark Paid with confirmation
-  async function markPaid(row: Row) {
-    const name =
-      (row.clients?.first_name || row.clients?.last_name)
-        ? `${row.clients?.first_name ?? ""} ${row.clients?.last_name ?? ""}`.trim()
-        : "customer";
-    const email = row.clients?.email ?? "no-email";
+  // inside pages/admin/index.tsx
 
-    const ok = window.confirm(
-      `Confirm marking ${row.rental_id} as Paid and sending a receipt to:\n\n` +
-      `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
-    );
-    if (!ok) return;
-
-    try {
-      const resp = await fetch("/api/admin/bookings/mark-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ rental_id: row.rental_id }),
-      });
-      const json = await resp.json().catch(() => ({} as any));
-
-      if (!resp.ok || json?.ok === false) {
-        alert(json?.error || "Failed to mark paid.");
-        return;
-      }
-
-      // Optimistically update row
-      setRows((prev) =>
-        prev.map((r) =>
-          r.id === row.id ? { ...r, status: "Paid", paid_at: new Date().toISOString() } : r
-        )
-      );
-
-      alert(json.emailed ? "Marked as paid. Receipt email sent." : "Marked as paid.");
-    } catch (e: any) {
-      alert(e?.message || "Network error.");
-    }
+async function markPaid(row: Row) {
+  // safety: no double-submit
+  if (!row?.rental_id) {
+    alert("Missing rental ID.");
+    return;
   }
+
+  const name =
+    (row.clients?.first_name || row.clients?.last_name)
+      ? `${row.clients?.first_name ?? ""} ${row.clients?.last_name ?? ""}`.trim()
+      : "customer";
+  const email = row.clients?.email ?? "no-email";
+
+  // ✅ native confirm dialog
+  const ok = window.confirm(
+    `Confirm marking ${row.rental_id} as Paid and sending a receipt to:\n\n` +
+    `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
+  );
+  if (!ok) return;
+
+  try {
+    const resp = await fetch("/api/admin/bookings/mark-paid", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ rental_id: row.rental_id }),
+    });
+    const json = await resp.json().catch(() => ({} as any));
+
+    if (!resp.ok || json?.ok === false) {
+      alert(json?.error || "Failed to mark paid.");
+      return;
+    }
+
+    // optimistic UI
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === row.id ? { ...r, status: "Paid", paid_at: new Date().toISOString() } : r
+      )
+    );
+
+    alert(json.emailed ? "Marked as paid. Receipt email sent." : "Marked as paid.");
+  } catch (e: any) {
+    alert(e?.message || "Network error.");
+  }
+}
+
 
   function openCloseModal(row: Row, preset: "completed" | "cancelled" | "reschedule") {
     setClosing(row);
