@@ -1,3 +1,4 @@
+// pages/api/book.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { Resend } from "resend";
@@ -10,7 +11,8 @@ type Out = Ok | Err;
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
 const FROM_EMAIL =
-  process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+  process.env.RESEND_FROM ||
+  "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 export default async function handler(
@@ -22,14 +24,13 @@ export default async function handler(
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
-  // Expect these field names from the form
   const {
-    trailer_id,                  // uuid
-    start_date,                  // "YYYY-MM-DD"
-    end_date,                    // "YYYY-MM-DD"
-    pickup_time,                 // "HH:mm" or ""
-    return_time,                 // "HH:mm" or ""
-    delivery_requested,          // boolean
+    trailer_id,                 // uuid
+    start_date,                 // "YYYY-MM-DD"
+    end_date,                   // "YYYY-MM-DD"
+    pickup_time,                // "HH:mm" or ""
+    return_time,                // "HH:mm" or ""
+    delivery_requested,         // boolean
     first_name,
     last_name,
     email,
@@ -41,21 +42,21 @@ export default async function handler(
   const bad = (field: string, msg: string, status = 400) =>
     res.status(status).json({ ok: false, error: msg, field });
 
-  // ------- Basic validation -------
-  if (!trailer_id)         return bad("trailer_id", "Trailer is required.");
-  if (!start_date)         return bad("start_date", "Start date required.");
-  if (!end_date)           return bad("end_date", "End date required.");
+  // Basic validation
+  if (!trailer_id) return bad("trailer_id", "Trailer is required.");
+  if (!start_date) return bad("start_date", "Start date required.");
+  if (!end_date) return bad("end_date", "End date required.");
   if (!first_name?.trim()) return bad("first_name", "First name required.");
-  if (!last_name?.trim())  return bad("last_name", "Last name required.");
-  if (!email?.trim())      return bad("email", "Email required.");
-  if (!phone?.trim())      return bad("phone", "Phone required.");
+  if (!last_name?.trim()) return bad("last_name", "Last name required.");
+  if (!email?.trim()) return bad("email", "Email required.");
+  if (!phone?.trim()) return bad("phone", "Phone required.");
 
   const normEmail = String(email).trim().toLowerCase();
   const normFirst = String(first_name).trim();
-  const normLast  = String(last_name).trim();
+  const normLast = String(last_name).trim();
   const normPhone = String(phone).trim();
 
-  // ------- Find or create client -------
+  // Find or create client
   let clientId: string | undefined;
 
   const { data: found, error: selErr } = await supabaseAdmin
@@ -71,7 +72,7 @@ export default async function handler(
 
   if (found?.length) {
     clientId = found[0].id;
-    // (Optional) refresh details
+    // Refresh details (best effort)
     await supabaseAdmin
       .from("clients")
       .update({
@@ -106,7 +107,7 @@ export default async function handler(
     clientId = newClient.id;
   }
 
-  // ------- Create booking -------
+  // Create booking
   const access_key = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit
   const pepper = process.env.ACCESS_PEPPER || "";
   const access_key_hash = crypto
@@ -114,7 +115,8 @@ export default async function handler(
     .update(access_key + pepper)
     .digest("hex");
 
-  const rental_id = "JLA-" + Math.floor(100000 + Math.random() * 900000).toString();
+  const rental_id =
+    "JLA-" + Math.floor(100000 + Math.random() * 900000).toString();
 
   const { error: bookErr } = await supabaseAdmin
     .from("bookings")
@@ -144,10 +146,10 @@ export default async function handler(
     });
   }
 
-  // ------- Email: Booking received (best effort) -------
+  // Email: Booking received (best effort)
   try {
-    if (resend && FROM_EMAIL && normEmail) {
-      // get trailer name to show in the email
+    if (resend && FROM_EMAIL) {
+      // Trailer name (nice-to-have)
       let trailerName: string | null = null;
       try {
         const { data: t } = await supabaseAdmin
@@ -165,6 +167,7 @@ export default async function handler(
         startDateISO: start_date,
         endDateISO: end_date,
         email: normEmail,
+        accessKey: access_key, // NEW: show + prefill Find link
       });
 
       await resend.emails.send({
@@ -175,9 +178,9 @@ export default async function handler(
       });
     }
   } catch {
-    /* ignore */
+    // ignore email failure
   }
 
-  // Success
+  // Success payload
   return res.status(200).json({ ok: true, rental_id, access_key });
 }
