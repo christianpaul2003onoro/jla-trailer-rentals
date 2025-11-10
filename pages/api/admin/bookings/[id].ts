@@ -4,6 +4,30 @@ import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
 import { Resend } from "resend";
 import { rescheduledHTML } from "../../../../server/emailTemplates";
+import { closedHTML } from "../../../../server/emailTemplates";
+
+// outcome is "completed" or "cancelled"
+const html = closedHTML({
+  firstName: client?.first_name ?? null,
+  rentalId: row.rental_id,
+  trailerName: trailer?.name ?? null,
+  startDateISO: row.start_date,
+  endDateISO: row.end_date,
+  outcome, // "completed" | "cancelled"
+});
+
+await resend.emails.send({
+  from: FROM_EMAIL,
+  to: client.email,
+  subject: outcome === "completed"
+    ? `Thank you — ${row.rental_id} completed`
+    : `Booking cancelled — ${row.rental_id}`,
+  html,
+});
+
+
+
+
 
 // after updating dates:
 const html = rescheduledHTML({
