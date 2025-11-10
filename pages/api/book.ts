@@ -24,13 +24,14 @@ export default async function handler(
     return res.status(405).json({ ok: false, error: "Method not allowed" });
   }
 
+  // Expect these field names from the form
   const {
-    trailer_id,                 // uuid
-    start_date,                 // "YYYY-MM-DD"
-    end_date,                   // "YYYY-MM-DD"
-    pickup_time,                // "HH:mm" or ""
-    return_time,                // "HH:mm" or ""
-    delivery_requested,         // boolean
+    trailer_id, // uuid
+    start_date, // "YYYY-MM-DD"
+    end_date, // "YYYY-MM-DD"
+    pickup_time, // "HH:mm" or ""
+    return_time, // "HH:mm" or ""
+    delivery_requested, // boolean
     first_name,
     last_name,
     email,
@@ -42,7 +43,7 @@ export default async function handler(
   const bad = (field: string, msg: string, status = 400) =>
     res.status(status).json({ ok: false, error: msg, field });
 
-  // Basic validation
+  // ------- Basic validation -------
   if (!trailer_id) return bad("trailer_id", "Trailer is required.");
   if (!start_date) return bad("start_date", "Start date required.");
   if (!end_date) return bad("end_date", "End date required.");
@@ -56,7 +57,7 @@ export default async function handler(
   const normLast = String(last_name).trim();
   const normPhone = String(phone).trim();
 
-  // Find or create client
+  // ------- Find or create client -------
   let clientId: string | undefined;
 
   const { data: found, error: selErr } = await supabaseAdmin
@@ -72,7 +73,7 @@ export default async function handler(
 
   if (found?.length) {
     clientId = found[0].id;
-    // Refresh details (best effort)
+    // (Optional) refresh details
     await supabaseAdmin
       .from("clients")
       .update({
@@ -107,7 +108,7 @@ export default async function handler(
     clientId = newClient.id;
   }
 
-  // Create booking
+  // ------- Create booking -------
   const access_key = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit
   const pepper = process.env.ACCESS_PEPPER || "";
   const access_key_hash = crypto
@@ -118,20 +119,18 @@ export default async function handler(
   const rental_id =
     "JLA-" + Math.floor(100000 + Math.random() * 900000).toString();
 
-  const { error: bookErr } = await supabaseAdmin
-    .from("bookings")
-    .insert({
-      rental_id,
-      trailer_id,
-      client_id: clientId!,
-      start_date,
-      end_date,
-      pickup_time: pickup_time || null,
-      return_time: return_time || null,
-      delivery_requested: !!delivery_requested,
-      status: "Pending",
-      access_key_hash,
-    });
+  const { error: bookErr } = await supabaseAdmin.from("bookings").insert({
+    rental_id,
+    trailer_id,
+    client_id: clientId!,
+    start_date,
+    end_date,
+    pickup_time: pickup_time || null,
+    return_time: return_time || null,
+    delivery_requested: !!delivery_requested,
+    status: "Pending",
+    access_key_hash,
+  });
 
   if (bookErr) {
     console.error("BOOKING_INSERT_ERROR", {
@@ -146,10 +145,10 @@ export default async function handler(
     });
   }
 
-  // Email: Booking received (best effort)
+  // ------- Email: Booking received (best effort) -------
   try {
-    if (resend && FROM_EMAIL) {
-      // Trailer name (nice-to-have)
+    if (resend && FROM_EMAIL && normEmail) {
+      // get trailer name to show in the email
       let trailerName: string | null = null;
       try {
         const { data: t } = await supabaseAdmin
@@ -167,7 +166,7 @@ export default async function handler(
         startDateISO: start_date,
         endDateISO: end_date,
         email: normEmail,
-        accessKey: access_key, // NEW: show + prefill Find link
+        accessKey: access_key, // include access key in the email
       });
 
       await resend.emails.send({
@@ -178,9 +177,9 @@ export default async function handler(
       });
     }
   } catch {
-    // ignore email failure
+    /* ignore */
   }
 
-  // Success payload
+  // Success
   return res.status(200).json({ ok: true, rental_id, access_key });
 }
