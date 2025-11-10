@@ -3,6 +3,23 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
 import { Resend } from "resend";
+import { paymentReceiptHTML } from "../../../../server/emailTemplates";
+
+// ...
+if (resend && FROM_EMAIL && to) {
+  const html = paymentReceiptHTML({
+    firstName: client?.first_name ?? null,
+    rentalId: b.rental_id,
+    trailerName: trailer?.name ?? null,
+    startDateISO: b.start_date,
+    endDateISO: b.end_date,
+  });
+  try {
+    await resend.emails.send({ from: FROM_EMAIL, to, subject: `Payment received — ${b.rental_id}`, html });
+  } catch {}
+}
+
+
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
 const FROM_EMAIL =
