@@ -1,14 +1,15 @@
 // server/emailTemplates.ts
 const SITE_URL = process.env.SITE_URL || "https://jlatrailers.com";
 const REVIEW_URL = process.env.REVIEW_URL || "";
-const INSTAGRAM_URL = process.env.INSTAGRAM_URL || "https://instagram.com/jlatrailers";
+const INSTAGRAM_URL =
+  process.env.INSTAGRAM_URL || "https://instagram.com/jlatrailers";
 
 type Common = {
   firstName?: string | null;
   rentalId: string;
   trailerName?: string | null;
-  startDateISO: string; // e.g., "2025-11-28"
-  endDateISO: string;   // e.g., "2025-11-29"
+  startDateISO: string; // "YYYY-MM-DD"
+  endDateISO: string;   // "YYYY-MM-DD"
 };
 
 const brand = {
@@ -24,13 +25,17 @@ const brand = {
 };
 
 const fmt = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 
 const logoUrl = `${SITE_URL}/logo.png`;
 
 function button(href: string, label: string) {
   return `
-  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 18px 0;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:18px 0;">
     <tr>
       <td bgcolor="${brand.accent}" style="border-radius:10px;">
         <a href="${href}" target="_blank"
@@ -42,13 +47,26 @@ function button(href: string, label: string) {
   </table>`;
 }
 
+function headerButton(href: string, label: string) {
+  return `
+    <a href="${href}" target="_blank"
+       style="display:inline-block;padding:8px 12px;border-radius:10px;background:${brand.accent};color:#fff;text-decoration:none;font-weight:700;font-size:12px;">
+       ${label}
+    </a>`;
+}
+
 function escapeHtml(s?: string | null) {
   if (!s) return "";
   return s.replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]!));
 }
 
-function layout(opts: { title: string; preheader?: string; bodyHtml: string }) {
-  const { title, preheader = "", bodyHtml } = opts;
+function layout(opts: {
+  title: string;
+  preheader?: string;
+  bodyHtml: string;
+  headerCta?: { href: string; label: string };
+}) {
+  const { title, preheader = "", bodyHtml, headerCta } = opts;
   return `
 <!doctype html>
 <html>
@@ -78,7 +96,9 @@ function layout(opts: { title: string; preheader?: string; bodyHtml: string }) {
                 <img src="${logoUrl}" alt="JLA Trailer Rentals" width="44" height="44" style="border-radius:8px;background:#fff"/>
                 <div style="font-size:18px;font-weight:800;">JLA Trailer Rentals</div>
               </td>
-              <td align="right" style="color:${brand.headerText};font-size:12px;">Miami, FL</td>
+              <td align="right" style="color:${brand.headerText};font-size:12px;">
+                ${headerCta ? headerButton(headerCta.href, headerCta.label) : ""}
+              </td>
             </tr>
           </table>
         </td>
@@ -125,21 +145,35 @@ function layout(opts: { title: string; preheader?: string; bodyHtml: string }) {
 /* ========== TEMPLATES ========== */
 
 // 1) Booking received (Status: Pending)
-export function bookingReceivedHTML(c: Common & { email?: string | null }) {
+export function bookingReceivedHTML(
+  c: Common & { email?: string | null; accessKey: string }
+) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
+  const findHref = `${SITE_URL}/find?r=${encodeURIComponent(c.rentalId)}&k=${encodeURIComponent(c.accessKey)}`;
   const body = `
     <p>${greeting}</p>
-    <p>We’ve received your booking request <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.</p>
+    <p>We’ve received your booking request
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.
+    </p>
     <table role="presentation" style="font-size:14px;color:${brand.text};margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
     </table>
+
+    <p style="margin:14px 0 6px;"><strong>Manage / check your booking:</strong></p>
+    <table role="presentation" style="font-size:14px;margin:6px 0 14px;">
+      <tr><td style="padding:2px 0;"><strong>Rental ID:</strong> ${c.rentalId}</td></tr>
+      <tr><td style="padding:2px 0;"><strong>Access Key:</strong> ${escapeHtml(c.accessKey)}</td></tr>
+    </table>
+    <p>Use the button below to open “Find my rental.” Your Rental ID and Access Key will be prefilled.</p>
+    ${button(findHref, "Find my rental")}
     <p>We’ll review your details and send an approval with a payment link.</p>
   `;
   return layout({
     title: `We received your booking — ${c.rentalId}`,
     preheader: `Booking received for ${fmt(c.startDateISO)} to ${fmt(c.endDateISO)}.`,
     bodyHtml: body,
+    headerCta: { href: findHref, label: "Find my rental" },
   });
 }
 
@@ -148,7 +182,9 @@ export function bookingApprovedHTML(c: Common & { paymentLink: string }) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
-    <p>Your booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span> is approved. Please complete your payment to confirm.</p>
+    <p>Your booking
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>
+      is approved. Please complete your payment to confirm.</p>
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
@@ -160,6 +196,7 @@ export function bookingApprovedHTML(c: Common & { paymentLink: string }) {
     title: `Approved — action needed for ${c.rentalId}`,
     preheader: "Booking approved. Complete payment to confirm.",
     bodyHtml: body,
+    headerCta: { href: `${SITE_URL}/find`, label: "Find my rental" },
   });
 }
 
@@ -168,7 +205,9 @@ export function paymentReceiptHTML(c: Common) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
-    <p>Thanks! We’ve received your payment for booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.</p>
+    <p>Thanks! We’ve received your payment for booking
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.
+    </p>
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
@@ -179,15 +218,20 @@ export function paymentReceiptHTML(c: Common) {
     title: `Payment received — ${c.rentalId}`,
     preheader: "Your rental is confirmed.",
     bodyHtml: body,
+    headerCta: { href: `${SITE_URL}/find`, label: "Find my rental" },
   });
 }
 
 // 4) Rescheduled
-export function rescheduledHTML(c: Common & { newStartISO: string; newEndISO: string }) {
+export function rescheduledHTML(
+  c: Common & { newStartISO: string; newEndISO: string }
+) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
-    <p>Your booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span> has been rescheduled.</p>
+    <p>Your booking
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>
+      has been rescheduled.</p>
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>New dates:</strong> ${fmt(c.newStartISO)} → ${fmt(c.newEndISO)}</td></tr>
@@ -198,6 +242,7 @@ export function rescheduledHTML(c: Common & { newStartISO: string; newEndISO: st
     title: `Updated dates — ${c.rentalId}`,
     preheader: `New dates: ${fmt(c.newStartISO)} → ${fmt(c.newEndISO)}`,
     bodyHtml: body,
+    headerCta: { href: `${SITE_URL}/find`, label: "Find my rental" },
   });
 }
 
@@ -222,6 +267,7 @@ export function finishedHTML(c: Common) {
     title: `Thank you — ${c.rentalId} completed`,
     preheader: "Thanks for renting with us!",
     bodyHtml: body,
+    headerCta: { href: `${SITE_URL}/find`, label: "Find my rental" },
   });
 }
 
@@ -243,5 +289,6 @@ export function cancelledHTML(c: Common & { reason?: string | null }) {
     title: `Booking cancelled — ${c.rentalId}`,
     preheader: "Your booking has been cancelled.",
     bodyHtml: body,
+    headerCta: { href: `${SITE_URL}/find`, label: "Find my rental" },
   });
 }
