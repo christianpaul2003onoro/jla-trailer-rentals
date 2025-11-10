@@ -1,4 +1,5 @@
 // server/emailTemplates.ts
+
 const SITE_URL = process.env.SITE_URL || "https://jlatrailers.com";
 const REVIEW_URL = process.env.REVIEW_URL || "";
 const INSTAGRAM_URL =
@@ -10,7 +11,7 @@ type Common = {
   rentalId: string;
   trailerName?: string | null;
   startDateISO: string; // e.g., "2025-11-28"
-  endDateISO: string; // e.g., "2025-11-29"
+  endDateISO: string;   // e.g., "2025-11-29"
 };
 
 const brand = {
@@ -18,7 +19,7 @@ const brand = {
   text: "#0b1220",
   subtext: "#475569",
   border: "#e5e7eb",
-  accent: "#22c55e", // in-body action buttons (green)
+  accent: "#22c55e",     // in-body action buttons (green)
   accentDark: "#16a34a",
   headerBg: "#0b1220",
   headerText: "#e5e7eb",
@@ -48,6 +49,20 @@ function button(href: string, label: string) {
   </table>`;
 }
 
+function bigCta(href: string, label: string) {
+  return `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 14px 0;">
+    <tr>
+      <td align="center">
+        <a href="${href}" target="_blank"
+           style="display:inline-block;padding:16px 22px;border-radius:12px;background:${brand.accent};color:#ffffff;text-decoration:none;font-weight:800;font-size:16px;">
+          ${label}
+        </a>
+      </td>
+    </tr>
+  </table>`;
+}
+
 function escapeHtml(s?: string | null) {
   if (!s) return "";
   return s.replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]!));
@@ -70,39 +85,39 @@ function layout(opts: { title: string; preheader?: string; bodyHtml: string }) {
     </style>
   </head>
   <body style="background:${brand.bg};color:${brand.text};font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;">
+    <!-- preheader (hidden in most clients) -->
     <div style="display:none;overflow:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;">
       ${preheader}
     </div>
 
     <!-- Header -->
-<table role="presentation" width="100%" style="background:${brand.headerBg};">
-  <tr>
-    <td style="padding:16px 0;">
-      <table role="presentation" width="600" align="center" style="width:600px;max-width:92%;margin:0 auto;">
-        <tr>
-          <!-- Logo cell -->
-          <td width="44" valign="middle">
-            <img src="${logoUrl}" alt="JLA Trailer Rentals" width="44" height="44" style="border-radius:8px;background:#fff;display:block"/>
-          </td>
-
-          <!-- Title cell with reliable spacing -->
-          <td valign="middle" style="padding-left:12px;color:${brand.headerText};font-size:18px;font-weight:800;white-space:nowrap;">
-            JLA Trailer Rentals
-          </td>
-
-          <!-- Right-side action (Find my rental) -->
-          <td align="right" valign="middle">
-            <a href="${SITE_URL}/find"
-               style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;border-radius:10px;padding:10px 16px;">
-              Find my rental
-            </a>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-
+    <table role="presentation" width="100%" style="background:${brand.headerBg};">
+      <tr>
+        <td style="padding:16px 0;">
+          <table role="presentation" width="600" align="center" style="width:600px;max-width:92%;margin:0 auto;">
+            <tr>
+              <!-- Logo cell -->
+              <td width="44" valign="middle">
+                <img src="${logoUrl}" alt="JLA Trailer Rentals" width="44" height="44"
+                     style="border-radius:8px;background:#fff;display:block"/>
+              </td>
+              <!-- Title cell with reliable spacing -->
+              <td valign="middle"
+                  style="padding-left:12px;color:${brand.headerText};font-size:18px;font-weight:800;white-space:nowrap;">
+                JLA Trailer Rentals
+              </td>
+              <!-- Right-side action (Find my rental) -->
+              <td align="right" valign="middle">
+                <a href="${FIND_URL}"
+                   style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;border-radius:10px;padding:10px 16px;">
+                  Find my rental
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
     <!-- Card -->
     <table role="presentation" width="100%">
@@ -151,9 +166,7 @@ export function bookingReceivedHTML(
   const body = `
     <p>${greeting}</p>
     <p>We’ve received your booking request
-      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">
-        ${c.rentalId}
-      </span>.
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.
     </p>
 
     <table role="presentation" style="font-size:14px;color:${brand.text};margin:14px 0;">
@@ -166,9 +179,9 @@ export function bookingReceivedHTML(
       <tr><td style="padding:4px 0;"><strong>Rental ID:</strong> ${c.rentalId}</td></tr>
       ${c.accessKey ? `<tr><td style="padding:4px 0;"><strong>Access Key:</strong> ${c.accessKey}</td></tr>` : ""}
     </table>
-    <p>You can use your Rental ID and Access Key above to check your order status in
-       <strong>Find my rental</strong> on our website.</p>
 
+    <p>You can use your Rental ID and Access Key above to check your order status in
+      <strong>Find my rental</strong> on our website.</p>
     ${button(FIND_URL, "Find my rental")}
 
     <p style="font-size:14px;color:${brand.subtext}">
@@ -189,11 +202,15 @@ export function bookingApprovedHTML(
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
-    <p>Your booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span> is approved. Please complete your payment to confirm.</p>
+    <p>Your booking
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>
+      is approved. Please complete your payment to confirm.</p>
+
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
     </table>
+
     ${button(c.paymentLink, "Pay & Confirm")}
     <p style="font-size:12px;color:${brand.subtext}">If you’ve already paid, you can ignore this message.</p>
   `;
@@ -209,11 +226,15 @@ export function paymentReceiptHTML(c: Common) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
-    <p>Thanks! We’ve received your payment for booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.</p>
+    <p>Thanks! We’ve received your payment for booking
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>.
+    </p>
+
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
     </table>
+
     <p>We’ll reach out if we need anything else before your rental.</p>
   `;
   return layout({
@@ -230,11 +251,15 @@ export function rescheduledHTML(
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
-    <p>Your booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span> has been rescheduled.</p>
+    <p>Your booking
+      <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span>
+      has been rescheduled.</p>
+
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>New dates:</strong> ${fmt(c.newStartISO)} → ${fmt(c.newEndISO)}</td></tr>
     </table>
+
     <p>If anything looks wrong, reply to this email or call us.</p>
   `;
   return layout({
@@ -254,12 +279,28 @@ export function finishedHTML(c: Common) {
   const body = `
     <p>${greeting}</p>
     <p>Thanks for choosing <strong>JLA Trailer Rentals</strong>! Your rental is marked as <strong>completed</strong>.</p>
+
     <p><span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span></p>
+
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
     </table>
-    ${REVIEW_URL ? button(REVIEW_URL, "Leave a quick review") : ""}
+
+    ${
+      REVIEW_URL
+        ? `
+          <div style="text-align:center;margin:18px 0 10px;font-size:26px;line-height:1;">⭐⭐⭐⭐⭐</div>
+          <p style="text-align:center;margin:6px 0 2px;">
+            <strong>If you left happy with our service or it was helpful, we’d love your honest review!</strong>
+          </p>
+          <p style="text-align:center;margin:0 0 10px;color:${brand.subtext};font-size:14px;">
+            Please use the button below — you’ll be redirected to our review page. Thanks again!
+          </p>
+          ${bigCta(REVIEW_URL, "Give a review")}
+        `
+        : ""
+    }
   `;
   return layout({
     title: `Thank you — ${c.rentalId} completed`,
@@ -276,11 +317,14 @@ export function cancelledHTML(
   const body = `
     <p>${greeting}</p>
     <p>Your booking with <strong>JLA Trailer Rentals</strong> has been <strong>cancelled</strong>.</p>
+
     <p><span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span></p>
+
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates were:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
     </table>
+
     ${c.reason ? `<p><strong>Reason:</strong> ${escapeHtml(c.reason)}</p>` : ""}
     <p>If this was unexpected, please reply to this email or call us.</p>
   `;
