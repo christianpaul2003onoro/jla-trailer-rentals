@@ -3,46 +3,11 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
 import { Resend } from "resend";
-import { rescheduledHTML } from "../../../../server/emailTemplates";
-import { closedHTML } from "../../../../server/emailTemplates";
-
-// outcome is "completed" or "cancelled"
-const html = closedHTML({
-  firstName: client?.first_name ?? null,
-  rentalId: row.rental_id,
-  trailerName: trailer?.name ?? null,
-  startDateISO: row.start_date,
-  endDateISO: row.end_date,
-  outcome, // "completed" | "cancelled"
-});
-
-await resend.emails.send({
-  from: FROM_EMAIL,
-  to: client.email,
-  subject: outcome === "completed"
-    ? `Thank you — ${row.rental_id} completed`
-    : `Booking cancelled — ${row.rental_id}`,
-  html,
-});
-
-
-
-
-
-// after updating dates:
-const html = rescheduledHTML({
-  firstName: client?.first_name ?? null,
-  rentalId: row.rental_id,
-  trailerName: trailer?.name ?? null,
-  startDateISO: oldStart, // if you want, otherwise reuse row.start_date
-  endDateISO: oldEnd,
-  newStartISO: row.start_date,
-  newEndISO: row.end_date,
-});
-await resend.emails.send({ from: FROM_EMAIL, to: client.email, subject: `Updated dates — ${row.rental_id}`, html });
-
-
-
+import {
+  rescheduledHTML,
+  finishedHTML,
+  cancelledHTML,
+} from "../../../../server/emailTemplates";
 
 type Ok = { ok: true; row?: any };
 type Err = { ok: false; error: string };
@@ -51,8 +16,6 @@ type Out = Ok | Err;
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
 const FROM_EMAIL =
   process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
-const REVIEW_URL =
-  process.env.REVIEW_URL || "https://g.page/r/YOUR_PUBLIC_REVIEW_LINK";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 // Explicit union type for the helper result
@@ -93,7 +56,9 @@ export default async function handler(
     try {
       const body = req.body || {};
 
+      // ------------------------
       // RESCHEDULE
+      // ------------------------
       if (body.reschedule_start && body.reschedule_end) {
         const { data: updated, error: updErr } = await supabaseAdmin
           .from("bookings")
@@ -115,39 +80,47 @@ export default async function handler(
           return res.status(500).json({ ok: false, error: updErr?.message || "Update failed" });
         }
 
-        // notify customer (best effort)
+        // notify customer (best effort) using the branded template
         try {
           if (resend && FROM_EMAIL) {
             const client = Array.isArray(updated.clients) ? updated.clients[0] : updated.clients;
             const trailer = Array.isArray(updated.trailers) ? updated.trailers[0] : updated.trailers;
             const to = client?.email as string | undefined;
+
             if (to) {
-              const subject = `Your booking has been rescheduled — ${updated.rental_id}`;
-              const start = updated.start_date;
-              const end = updated.end_date;
-              const html = `
-                <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
-                  <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
-                  <p>Your booking with <strong>JLA Trailer Rentals</strong> has been rescheduled.</p>
-                  <p>${trailer?.name ? `Trailer: <strong>${trailer.name}</strong><br/>` : ""}New dates: <strong>${start}</strong> → <strong>${end}</strong></p>
-                  <p>If anything looks wrong, reply to this email or call (786) 760-6175.</p>
-                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
-                  <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
-                </div>
-              `;
-              await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
+              const html = rescheduledHTML({
+                firstName: client?.first_name ?? null,
+                rentalId: updated.rental_id,
+                trailerName: trailer?.name ?? null,
+                // These two fields are required by the Common type; not used in the template body
+                startDateISO: updated.start_date,
+                endDateISO: updated.end_date,
+                newStartISO: updated.start_date,
+                newEndISO: updated.end_date,
+              });
+
+              await resend.emails.send({
+                from: FROM_EMAIL,
+                to,
+                subject: `Updated dates — ${updated.rental_id}`,
+                html,
+              });
             }
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         return res.status(200).json({ ok: true, row: updated });
       }
 
+      // ------------------------
       // CLOSE (Finished / Cancelled), with optional emails
+      // ------------------------
       if (body.status === "Closed") {
         const toUpdate: any = {
           status: "Closed",
-          close_outcome: body.close_outcome ?? null,
+          close_outcome: body.close_outcome ?? null, // "completed" | "cancelled"
           close_reason: body.close_reason ?? null,
         };
 
@@ -168,48 +141,53 @@ export default async function handler(
           return res.status(500).json({ ok: false, error: updErr?.message || "Update failed" });
         }
 
-        // emails (best effort)
+        // emails (best effort), using the split templates
         try {
           if (resend && FROM_EMAIL) {
             const client = Array.isArray(updated.clients) ? updated.clients[0] : updated.clients;
             const trailer = Array.isArray(updated.trailers) ? updated.trailers[0] : updated.trailers;
             const to = client?.email as string | undefined;
 
+            // Finished: send “Thank you” email only if checkbox requested
             if (to && updated.close_outcome === "completed" && body.send_thank_you) {
-              const subject = `Thank you — ${updated.rental_id} completed`;
-              const html = `
-                <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
-                  <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
-                  <p>Thanks for choosing <strong>JLA Trailer Rentals</strong>! Your rental is marked as <strong>completed</strong>.</p>
-                  <p>${trailer?.name ? `Trailer: <strong>${trailer.name}</strong><br/>` : ""}Dates: <strong>${updated.start_date}</strong> → <strong>${updated.end_date}</strong></p>
-                  <p>We’d love your feedback. Please take a moment to leave us a quick review:</p>
-                  <p><a href="${REVIEW_URL}" target="_blank" style="display:inline-block;padding:10px 14px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700">Leave a Review</a></p>
-                  <p>Need anything else? Call (786) 760-6175 or reply to this email.</p>
-                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
-                  <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
-                </div>
-              `;
-              await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
+              const html = finishedHTML({
+                firstName: client?.first_name ?? null,
+                rentalId: updated.rental_id,
+                trailerName: trailer?.name ?? null,
+                startDateISO: updated.start_date,
+                endDateISO: updated.end_date,
+              });
+
+              await resend.emails.send({
+                from: FROM_EMAIL,
+                to,
+                subject: `Thank you — ${updated.rental_id} completed`,
+                html,
+              });
             }
 
+            // Cancelled: send cancellation email only if checkbox requested
             if (to && updated.close_outcome === "cancelled" && body.send_cancel_email) {
-              const subject = `Booking cancelled — ${updated.rental_id}`;
-              const reason = updated.close_reason ? `Reason: ${updated.close_reason}` : "";
-              const html = `
-                <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
-                  <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
-                  <p>Your booking with <strong>JLA Trailer Rentals</strong> has been <strong>cancelled</strong>.</p>
-                  <p>${trailer?.name ? `Trailer: <strong>${trailer.name}</strong><br/>` : ""}Dates were: <strong>${updated.start_date}</strong> → <strong>${updated.end_date}</strong></p>
-                  <p>${reason}</p>
-                  <p>If this was unexpected, please reply to this email or call (786) 760-6175.</p>
-                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
-                  <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
-                </div>
-              `;
-              await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
+              const html = cancelledHTML({
+                firstName: client?.first_name ?? null,
+                rentalId: updated.rental_id,
+                trailerName: trailer?.name ?? null,
+                startDateISO: updated.start_date,
+                endDateISO: updated.end_date,
+                reason: updated.close_reason ?? null,
+              });
+
+              await resend.emails.send({
+                from: FROM_EMAIL,
+                to,
+                subject: `Booking cancelled — ${updated.rental_id}`,
+                html,
+              });
             }
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         return res.status(200).json({ ok: true, row: updated });
       }
