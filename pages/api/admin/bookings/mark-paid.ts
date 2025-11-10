@@ -1,25 +1,8 @@
-// pages/api/admin/bookings/mark-paid.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
 import { Resend } from "resend";
 import { paymentReceiptHTML } from "../../../../server/emailTemplates";
-
-// ...
-if (resend && FROM_EMAIL && to) {
-  const html = paymentReceiptHTML({
-    firstName: client?.first_name ?? null,
-    rentalId: b.rental_id,
-    trailerName: trailer?.name ?? null,
-    startDateISO: b.start_date,
-    endDateISO: b.end_date,
-  });
-  try {
-    await resend.emails.send({ from: FROM_EMAIL, to, subject: `Payment received — ${b.rental_id}`, html });
-  } catch {}
-}
-
-
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
 const FROM_EMAIL =
@@ -39,12 +22,12 @@ export default async function handler(
   if (!requireAdmin(req, res)) return;
 
   try {
-    const { rental_id } = req.body || {};
+    const { rental_id } = (req.body ?? {}) as { rental_id?: string };
     if (!rental_id) {
       return res.status(400).json({ ok: false, error: "Missing rental_id" });
     }
 
-    // Get booking + client + trailer
+    // Fetch booking with client + trailer
     const { data: b, error } = await supabaseAdmin
       .from("bookings")
       .select(`
@@ -59,7 +42,7 @@ export default async function handler(
       return res.status(404).json({ ok: false, error: "Booking not found" });
     }
 
-    // IDEMPOTENCY: if already paid, do nothing (no extra email)
+    // Idempotency: already paid? don’t re-email.
     if (b.paid_at || b.status === "Paid") {
       return res.status(200).json({ ok: true, emailed: false });
     }
@@ -74,7 +57,7 @@ export default async function handler(
       return res.status(500).json({ ok: false, error: updErr.message });
     }
 
-    // Best-effort event log
+    // Best-effort: log event
     try {
       await supabaseAdmin
         .from("booking_events")
@@ -83,29 +66,28 @@ export default async function handler(
       /* ignore */
     }
 
-    // Best-effort email receipt
+    // Best-effort: email receipt via template
     let emailed = false;
     const client = Array.isArray(b.clients) ? b.clients[0] : b.clients;
     const trailer = Array.isArray(b.trailers) ? b.trailers[0] : b.trailers;
     const to = client?.email as string | undefined;
 
     if (resend && FROM_EMAIL && to) {
-      const subject = `Payment received — ${b.rental_id}`;
-      const html = `
-        <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
-          <p>${client?.first_name ? `Hi ${client.first_name},` : "Hello,"}</p>
-          <p>Thanks for renting with <strong>JLA Trailer Rentals</strong> — we’ve received your payment.</p>
-          <p>${trailer?.name ? `Trailer: <strong>${trailer.name}</strong><br/>` : "" }
-             Dates: <strong>${b.start_date}</strong> → <strong>${b.end_date}</strong></p>
-          <p>Pickup/delivery details are arranged. We’ll contact you if needed.<br/>
-             Questions? Call (786) 760-6175 or email JLAtrailerrental@gmail.com.</p>
-          <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
-          <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
-        </div>
-      `;
+      const html = paymentReceiptHTML({
+        firstName: client?.first_name ?? null,
+        rentalId: b.rental_id,
+        trailerName: trailer?.name ?? null,
+        startDateISO: b.start_date,
+        endDateISO: b.end_date,
+      });
+
       try {
-        const resp = await resend.emails.send({ from: FROM_EMAIL, to, subject, html });
-        // Resend returns { data, error }
+        const resp = await resend.emails.send({
+          from: FROM_EMAIL,
+          to,
+          subject: `Payment received — ${b.rental_id}`,
+          html,
+        });
         emailed = !!resp?.data?.id;
       } catch {
         /* ignore */
