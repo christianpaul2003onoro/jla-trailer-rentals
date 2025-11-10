@@ -288,19 +288,28 @@ export function finishedHTML(c: Common) {
     </table>
 
     ${
-      REVIEW_URL
-        ? `
-          <div style="text-align:center;margin:18px 0 10px;font-size:26px;line-height:1;">⭐⭐⭐⭐⭐</div>
-          <p style="text-align:center;margin:6px 0 2px;">
-            <strong>If you left happy with our service or it was helpful, we’d love your honest review!</strong>
-          </p>
-          <p style="text-align:center;margin:0 0 10px;color:${brand.subtext};font-size:14px;">
-            Please use the button below — you’ll be redirected to our review page. Thanks again!
-          </p>
-          ${bigCta(REVIEW_URL, "Give a review")}
-        `
-        : ""
-    }
+  REVIEW_URL
+    ? `
+      <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" style="margin:18px auto 10px;">
+        <tr>
+          <td style="font-size:28px;line-height:1;padding:0 2px;">⭐</td>
+          <td style="font-size:28px;line-height:1;padding:0 2px;">⭐</td>
+          <td style="font-size:28px;line-height:1;padding:0 2px;">⭐</td>
+          <td style="font-size:28px;line-height:1;padding:0 2px;">⭐</td>
+          <td style="font-size:28px;line-height:1;padding:0 2px;">⭐</td>
+        </tr>
+      </table>
+      <p style="text-align:center;margin:6px 0 2px;">
+        <strong>If you left happy with our service or it was helpful, we’d love your honest review!</strong>
+      </p>
+      <p style="text-align:center;margin:0 0 10px;color:${brand.subtext};font-size:14px;">
+        Please use the button below — you’ll be redirected to our review page. Thanks again!
+      </p>
+      ${bigCta(REVIEW_URL, "Give a review")}
+    `
+    : ""
+}
+
   `;
   return layout({
     title: `Thank you — ${c.rentalId} completed`,
