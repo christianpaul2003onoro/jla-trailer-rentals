@@ -16,7 +16,7 @@ const brand = {
   text: "#0b1220",
   subtext: "#475569",
   border: "#e5e7eb",
-  accent: "#22c55e",      // green
+  accent: "#22c55e",
   accentDark: "#16a34a",
   headerBg: "#0b1220",
   headerText: "#e5e7eb",
@@ -42,11 +42,12 @@ function button(href: string, label: string) {
   </table>`;
 }
 
-function layout(opts: {
-  title: string;
-  preheader?: string;
-  bodyHtml: string;
-}) {
+function escapeHtml(s?: string | null) {
+  if (!s) return "";
+  return s.replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]!));
+}
+
+function layout(opts: { title: string; preheader?: string; bodyHtml: string }) {
   const { title, preheader = "", bodyHtml } = opts;
   return `
 <!doctype html>
@@ -56,7 +57,6 @@ function layout(opts: {
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>${title}</title>
     <style>
-      /* Basic email-safe reset */
       img{border:none;outline:none;text-decoration:none;display:block;max-width:100%}
       table{border-collapse:collapse!important}
       body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%}
@@ -64,7 +64,6 @@ function layout(opts: {
     </style>
   </head>
   <body style="background:${brand.bg};color:${brand.text};font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;">
-    <!-- preheader (hidden in most clients) -->
     <div style="display:none;overflow:hidden;opacity:0;color:transparent;height:0;width:0;max-height:0;max-width:0;">
       ${preheader}
     </div>
@@ -145,9 +144,7 @@ export function bookingReceivedHTML(c: Common & { email?: string | null }) {
 }
 
 // 2) Approved (Status: Approved) + Payment link
-export function bookingApprovedHTML(
-  c: Common & { paymentLink: string }
-) {
+export function bookingApprovedHTML(c: Common & { paymentLink: string }) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
@@ -186,9 +183,7 @@ export function paymentReceiptHTML(c: Common) {
 }
 
 // 4) Rescheduled
-export function rescheduledHTML(
-  c: Common & { newStartISO: string; newEndISO: string }
-) {
+export function rescheduledHTML(c: Common & { newStartISO: string; newEndISO: string }) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
   const body = `
     <p>${greeting}</p>
@@ -206,25 +201,47 @@ export function rescheduledHTML(
   });
 }
 
-// 5) Closed (Finished or Cancelled)
-export function closedHTML(
-  c: Common & { outcome: "completed" | "cancelled" }
-) {
+/* -------------------------------
+   5) CLOSED ⇒ SPLIT TEMPLATES
+-------------------------------- */
+
+// 5a) Finished (business fulfilled)
+export function finishedHTML(c: Common) {
   const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
-  const isDone = c.outcome === "completed";
   const body = `
     <p>${greeting}</p>
-    <p>Your booking <span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span> has been ${isDone ? "completed" : "cancelled"}.</p>
+    <p>Thanks for choosing <strong>JLA Trailer Rentals</strong>! Your rental is marked as <strong>completed</strong>.</p>
+    <p><span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span></p>
     <table role="presentation" style="font-size:14px;margin:14px 0;">
       <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
       <tr><td style="padding:4px 0;"><strong>Dates:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
     </table>
-    ${isDone && REVIEW_URL ? button(REVIEW_URL, "Leave a quick review") : ""}
-    <p>${isDone ? "Thank you for choosing JLA Trailer Rentals!" : "We hope to serve you in the future."}</p>
+    ${REVIEW_URL ? button(REVIEW_URL, "Leave a quick review") : ""}
   `;
   return layout({
-    title: isDone ? `Thank you — ${c.rentalId} completed` : `Booking cancelled — ${c.rentalId}`,
-    preheader: isDone ? "Thanks for renting with us!" : "Your booking has been cancelled.",
+    title: `Thank you — ${c.rentalId} completed`,
+    preheader: "Thanks for renting with us!",
+    bodyHtml: body,
+  });
+}
+
+// 5b) Cancelled
+export function cancelledHTML(c: Common & { reason?: string | null }) {
+  const greeting = c.firstName ? `Hi ${c.firstName},` : "Hello,";
+  const body = `
+    <p>${greeting}</p>
+    <p>Your booking with <strong>JLA Trailer Rentals</strong> has been <strong>cancelled</strong>.</p>
+    <p><span style="background:${brand.chipBg};padding:2px 6px;border-radius:6px;font-weight:700;">${c.rentalId}</span></p>
+    <table role="presentation" style="font-size:14px;margin:14px 0;">
+      <tr><td style="padding:4px 0;"><strong>Trailer:</strong> ${c.trailerName ?? "—"}</td></tr>
+      <tr><td style="padding:4px 0;"><strong>Dates were:</strong> ${fmt(c.startDateISO)} → ${fmt(c.endDateISO)}</td></tr>
+    </table>
+    ${c.reason ? `<p><strong>Reason:</strong> ${escapeHtml(c.reason)}</p>` : ""}
+    <p>If this was unexpected, please reply to this email or call us.</p>
+  `;
+  return layout({
+    title: `Booking cancelled — ${c.rentalId}`,
+    preheader: "Your booking has been cancelled.",
     bodyHtml: body,
   });
 }
