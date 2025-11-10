@@ -1,39 +1,15 @@
-// pages/api/admin/bookings/approve.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdmin } from "../../../../server/adminauth";
 import { bookingApprovedHTML } from "../../../../server/emailTemplates";
 
-// ...
-const html = bookingApprovedHTML({
-  firstName: client?.first_name ?? null,
-  rentalId: row.rental_id,
-  trailerName: trailer?.name ?? null,
-  startDateISO: row.start_date,
-  endDateISO: row.end_date,
-  paymentLink, // the link you already capture in ApproveModal
-});
-
-await resend.emails.send({
-  from: FROM_EMAIL,
-  to: client.email,
-  subject: `Approved — ${row.rental_id}`,
-  html,
-});
-
-
-
-
-
-/** ---------- ENV + CLIENTS ---------- */
-// Match your Vercel env names exactly.
+/* ---------- ENV & CLIENTS ---------- */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE as string; // <— this one
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE as string;
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string;
 const FROM_EMAIL =
-  process.env.RESEND_FROM || // <— your var on Vercel
-  "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+  process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 
 if (!SUPABASE_URL) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
 if (!SUPABASE_SERVICE_ROLE) throw new Error("Missing SUPABASE_SERVICE_ROLE");
@@ -44,17 +20,19 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
 });
 const resend = new Resend(RESEND_API_KEY);
 
-/** ---------- HELPERS ---------- */
+/* ---------- HELPERS ---------- */
 type MaybeArr<T> = T | T[] | null | undefined;
 const first = <T,>(v: MaybeArr<T>): T | undefined =>
   Array.isArray(v) ? v[0] : (v ?? undefined);
 
 const bad = (res: NextApiResponse, status: number, message: string) =>
   res.status(status).json({ ok: false, error: message });
+
 const ok = (res: NextApiResponse, data: any) =>
   res.status(200).json({ ok: true, ...data });
 
-function isHttpUrl(s: string) {
+function isHttpUrl(s?: string): s is string {
+  if (!s) return false;
   try {
     const u = new URL(s);
     return u.protocol === "http:" || u.protocol === "https:";
@@ -63,41 +41,12 @@ function isHttpUrl(s: string) {
   }
 }
 
-function paymentEmailHTML(params: {
-  firstName?: string;
-  rentalId: string;
-  trailerName?: string;
-  startDate?: string;
-  endDate?: string;
-  paymentLink: string;
-}) {
-  const { firstName, rentalId, trailerName, startDate, endDate, paymentLink } =
-    params;
-  const greet = firstName ? `Hi ${firstName},` : "Hello,";
-  return `
-  <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;line-height:1.6;color:#0b1220">
-    <p>${greet}</p>
-    <p>Your booking <strong>${rentalId}</strong>${
-    trailerName ? ` for <strong>${trailerName}</strong>` : ""
-  }${
-    startDate && endDate
-      ? ` from <strong>${startDate}</strong> to <strong>${endDate}</strong>`
-      : ""
-  } has been <strong>approved</strong>.</p>
-    <p>Please complete your payment using the link below:</p>
-    <p><a href="${paymentLink}" style="background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;display:inline-block">Pay now</a></p>
-    <p style="word-break:break-all">${paymentLink}</p>
-    <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0" />
-    <p style="font-size:12px;color:#64748b">JLA Trailer Rentals • Miami, FL</p>
-  </div>`;
-}
-
-/** ---------- HANDLER ---------- */
+/* ---------- HANDLER ---------- */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Only POST is allowed for this route.
+  // Only POST
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return bad(res, 405, "Method not allowed");
@@ -113,7 +62,7 @@ export default async function handler(
   };
 
   if (!bookingId) return bad(res, 400, "Missing bookingId");
-  if (!paymentLink || !isHttpUrl(paymentLink))
+  if (!isHttpUrl(paymentLink))
     return bad(res, 400, "Invalid paymentLink (must be http/https)");
 
   // 1) Fetch booking + client + trailer
@@ -167,15 +116,15 @@ export default async function handler(
   );
   const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
 
-  // 3) Send email via Resend
-  const subject = `Payment link for your rental ${updated.rental_id}`;
-  const html = paymentEmailHTML({
-    firstName: updatedClient?.first_name,
+  // 3) Send “Approved + Pay & Confirm” email using the branded template
+  const subject = `Approved — ${updated.rental_id}`;
+  const html = bookingApprovedHTML({
+    firstName: updatedClient?.first_name ?? null,
     rentalId: updated.rental_id,
-    trailerName: updatedTrailer?.name,
-    startDate: updated.start_date,
-    endDate: updated.end_date,
-    paymentLink,
+    trailerName: updatedTrailer?.name ?? null,
+    startDateISO: updated.start_date,
+    endDateISO: updated.end_date,
+    paymentLink: paymentLink!, // validated above
   });
 
   try {
@@ -186,6 +135,7 @@ export default async function handler(
       html,
     });
   } catch (e: any) {
+    // Still return success with emailSent=false so UI can show a toast
     return ok(res, {
       row: updated,
       emailSent: false,
