@@ -3,6 +3,22 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
 import { Resend } from "resend";
+import { rescheduledHTML } from "../../../../server/emailTemplates";
+
+// after updating dates:
+const html = rescheduledHTML({
+  firstName: client?.first_name ?? null,
+  rentalId: row.rental_id,
+  trailerName: trailer?.name ?? null,
+  startDateISO: oldStart, // if you want, otherwise reuse row.start_date
+  endDateISO: oldEnd,
+  newStartISO: row.start_date,
+  newEndISO: row.end_date,
+});
+await resend.emails.send({ from: FROM_EMAIL, to: client.email, subject: `Updated dates — ${row.rental_id}`, html });
+
+
+
 
 type Ok = { ok: true; row?: any };
 type Err = { ok: false; error: string };
