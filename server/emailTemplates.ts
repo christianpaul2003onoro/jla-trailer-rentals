@@ -75,27 +75,34 @@ function layout(opts: { title: string; preheader?: string; bodyHtml: string }) {
     </div>
 
     <!-- Header -->
-    <table role="presentation" width="100%" style="background:${brand.headerBg};">
-      <tr>
-        <td style="padding:16px 0;">
-          <table role="presentation" width="600" align="center" style="width:600px;max-width:92%;margin:0 auto;">
-            <tr>
-              <td style="display:flex;align-items:center;gap:16px;color:${brand.headerText};">
-                <img src="${logoUrl}" alt="JLA Trailer Rentals" width="44" height="44" style="border-radius:8px;background:#fff"/>
-                <div style="font-size:18px;font-weight:800;">JLA Trailer Rentals</div>
-              </td>
-              <td align="right">
-                <a href="${FIND_URL}" target="_blank"
-                   style="display:inline-block;padding:10px 14px;border-radius:10px;
-                          background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;">
-                  Find my rental
-                </a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+<table role="presentation" width="100%" style="background:${brand.headerBg};">
+  <tr>
+    <td style="padding:16px 0;">
+      <table role="presentation" width="600" align="center" style="width:600px;max-width:92%;margin:0 auto;">
+        <tr>
+          <!-- Logo cell -->
+          <td width="44" valign="middle">
+            <img src="${logoUrl}" alt="JLA Trailer Rentals" width="44" height="44" style="border-radius:8px;background:#fff;display:block"/>
+          </td>
+
+          <!-- Title cell with reliable spacing -->
+          <td valign="middle" style="padding-left:12px;color:${brand.headerText};font-size:18px;font-weight:800;white-space:nowrap;">
+            JLA Trailer Rentals
+          </td>
+
+          <!-- Right-side action (Find my rental) -->
+          <td align="right" valign="middle">
+            <a href="${SITE_URL}/find"
+               style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;border-radius:10px;padding:10px 16px;">
+              Find my rental
+            </a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
 
     <!-- Card -->
     <table role="presentation" width="100%">
