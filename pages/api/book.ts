@@ -1,33 +1,17 @@
-// pages/api/book.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
+import { Resend } from "resend";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { bookingReceivedHTML } from "../../server/emailTemplates";
-
-// ...
-if (clientEmail) {
-  const html = bookingReceivedHTML({
-    firstName,
-    rentalId,
-    trailerName,
-    startDateISO,
-    endDateISO,
-    email: clientEmail,
-  });
-  await resend.emails.send({
-    from: FROM_EMAIL,
-    to: clientEmail,
-    subject: `We received your booking — ${rentalId}`,
-    html,
-  });
-}
-
-
-
 
 type Ok = { ok: true; rental_id: string; access_key: string };
 type Err = { ok: false; error: string; field?: string };
 type Out = Ok | Err;
+
+const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
+const FROM_EMAIL =
+  process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 export default async function handler(
   req: NextApiRequest,
@@ -41,8 +25,8 @@ export default async function handler(
   // Expect these field names from the form
   const {
     trailer_id,                  // uuid
-    start_date,                  // "YYYY-MM-DD" (date col)
-    end_date,                    // "YYYY-MM-DD" (date col)
+    start_date,                  // "YYYY-MM-DD"
+    end_date,                    // "YYYY-MM-DD"
     pickup_time,                 // "HH:mm" or ""
     return_time,                 // "HH:mm" or ""
     delivery_requested,          // boolean
@@ -71,7 +55,7 @@ export default async function handler(
   const normLast  = String(last_name).trim();
   const normPhone = String(phone).trim();
 
-  // ------- Find or create client (admin client bypasses RLS) -------
+  // ------- Find or create client -------
   let clientId: string | undefined;
 
   const { data: found, error: selErr } = await supabaseAdmin
@@ -87,7 +71,7 @@ export default async function handler(
 
   if (found?.length) {
     clientId = found[0].id;
-    // (Optional) keep details fresh
+    // (Optional) refresh details
     await supabaseAdmin
       .from("clients")
       .update({
@@ -143,8 +127,8 @@ export default async function handler(
       pickup_time: pickup_time || null,
       return_time: return_time || null,
       delivery_requested: !!delivery_requested,
-      status: "Pending",       // booking_status enum in your schema
-      access_key_hash,         // hash column (no plaintext in DB)
+      status: "Pending",
+      access_key_hash,
     });
 
   if (bookErr) {
@@ -160,6 +144,40 @@ export default async function handler(
     });
   }
 
-  // Return creds for the success page
+  // ------- Email: Booking received (best effort) -------
+  try {
+    if (resend && FROM_EMAIL && normEmail) {
+      // get trailer name to show in the email
+      let trailerName: string | null = null;
+      try {
+        const { data: t } = await supabaseAdmin
+          .from("trailers")
+          .select("name")
+          .eq("id", trailer_id)
+          .single();
+        trailerName = t?.name ?? null;
+      } catch {}
+
+      const html = bookingReceivedHTML({
+        firstName: normFirst,
+        rentalId: rental_id,
+        trailerName,
+        startDateISO: start_date,
+        endDateISO: end_date,
+        email: normEmail,
+      });
+
+      await resend.emails.send({
+        from: FROM_EMAIL,
+        to: normEmail,
+        subject: `We received your booking — ${rental_id}`,
+        html,
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Success
   return res.status(200).json({ ok: true, rental_id, access_key });
 }
