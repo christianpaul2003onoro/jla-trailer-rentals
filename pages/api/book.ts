@@ -2,6 +2,28 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import crypto from "crypto";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
+import { bookingReceivedHTML } from "../../server/emailTemplates";
+
+// ...
+if (clientEmail) {
+  const html = bookingReceivedHTML({
+    firstName,
+    rentalId,
+    trailerName,
+    startDateISO,
+    endDateISO,
+    email: clientEmail,
+  });
+  await resend.emails.send({
+    from: FROM_EMAIL,
+    to: clientEmail,
+    subject: `We received your booking — ${rentalId}`,
+    html,
+  });
+}
+
+
+
 
 type Ok = { ok: true; rental_id: string; access_key: string };
 type Err = { ok: false; error: string; field?: string };
