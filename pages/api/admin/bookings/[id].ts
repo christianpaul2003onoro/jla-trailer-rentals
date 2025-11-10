@@ -3,27 +3,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { supabaseAdmin } from "../../../../lib/supabaseAdmin";
 import { requireAdmin } from "../../../../server/adminauth";
 import { Resend } from "resend";
-import { bookingApprovedHTML } from "../../../../server/emailTemplates";
-
-// ...
-const html = bookingApprovedHTML({
-  firstName: client?.first_name ?? null,
-  rentalId: row.rental_id,
-  trailerName: trailer?.name ?? null,
-  startDateISO: row.start_date,
-  endDateISO: row.end_date,
-  paymentLink, // the link you already capture in ApproveModal
-});
-
-await resend.emails.send({
-  from: FROM_EMAIL,
-  to: client.email,
-  subject: `Approved — ${row.rental_id}`,
-  html,
-});
-
-
-
 
 type Ok = { ok: true; row?: any };
 type Err = { ok: false; error: string };
