@@ -32,7 +32,7 @@ export default function Home() {
       >
         {/* Background image */}
         <img
-          src="/home_page_background_wallpaper.png"
+          src="/home_page_background_wallpaper.png.jpg"
           alt="Pickup truck towing a car on a trailer at sunset"
           style={{
             position: "absolute",
