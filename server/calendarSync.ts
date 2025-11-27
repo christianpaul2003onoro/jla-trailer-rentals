@@ -49,15 +49,23 @@ const SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
 /**
  * Normalize a PEM private key from environment variable format.
- * Handles:
- * - Single escaped \n -> actual newlines
- * - Double escaped \\n -> actual newlines
+ * 
+ * Environment variables may contain:
+ * - Literal "\n" characters (the string backslash-n, not actual newlines)
+ * - Actual newline characters
+ * - Double-quoted values with escaped sequences
+ * 
+ * This function handles:
+ * - Double-escaped sequences: literal "\\n" -> actual newline
+ * - Single-escaped sequences: literal "\n" -> actual newline  
  * - Trims whitespace
  */
 function normalizePrivateKey(key: string): string {
-  // First pass: replace double-escaped \\n with actual newlines
+  // First pass: replace double-escaped \\n (literal backslash-backslash-n) with actual newlines
+  // In JavaScript regex, \\\\ matches two literal backslashes
   let normalized = key.replace(/\\\\n/g, "\n");
-  // Second pass: replace single-escaped \n with actual newlines
+  // Second pass: replace single-escaped \n (literal backslash-n) with actual newlines
+  // In JavaScript regex, \\n matches a literal backslash followed by 'n'
   normalized = normalized.replace(/\\n/g, "\n");
   // Trim any leading/trailing whitespace
   return normalized.trim();
@@ -210,49 +218,55 @@ function isTimestamp(dateStr: string): boolean {
 
 /**
  * Safely parse a date/time string and extract the hour.
- * Returns the default hour if parsing fails.
+ * Returns the default hour if parsing fails or dateStr is not a timestamp.
  */
 function parseHourFromTimestamp(dateStr: string, defaultHour: number): number {
-  try {
-    if (isTimestamp(dateStr)) {
-      // Extract time portion: "2024-01-15T17:30:00" -> "17:30:00"
-      const timePart = dateStr.split("T")[1];
-      if (timePart) {
-        const hourStr = timePart.split(":")[0];
-        const hour = parseInt(hourStr, 10);
-        if (!isNaN(hour) && hour >= 0 && hour <= 23) {
-          return hour;
-        }
-      }
-    }
-  } catch {
-    console.warn(`[CalendarSync] WARNING: Failed to parse hour from timestamp: ${dateStr}`);
+  if (!isTimestamp(dateStr)) {
+    return defaultHour;
   }
-  return defaultHour;
+  
+  // Extract time portion: "2024-01-15T17:30:00" -> "17:30:00"
+  const timePart = dateStr.split("T")[1];
+  if (!timePart) {
+    console.warn(`[CalendarSync] WARNING: Failed to parse hour from timestamp: ${dateStr}`);
+    return defaultHour;
+  }
+  
+  const hourStr = timePart.split(":")[0];
+  const hour = parseInt(hourStr, 10);
+  if (isNaN(hour) || hour < 0 || hour > 23) {
+    console.warn(`[CalendarSync] WARNING: Invalid hour parsed from timestamp: ${dateStr}`);
+    return defaultHour;
+  }
+  
+  return hour;
 }
 
 /**
  * Safely parse minutes from a timestamp string.
- * Returns 0 if parsing fails.
+ * Returns 0 if parsing fails or dateStr is not a timestamp.
  */
 function parseMinutesFromTimestamp(dateStr: string): number {
-  try {
-    if (isTimestamp(dateStr)) {
-      const timePart = dateStr.split("T")[1];
-      if (timePart) {
-        const parts = timePart.split(":");
-        if (parts.length >= 2) {
-          const minutes = parseInt(parts[1], 10);
-          if (!isNaN(minutes) && minutes >= 0 && minutes <= 59) {
-            return minutes;
-          }
-        }
-      }
-    }
-  } catch {
-    // Fall through to return 0
+  if (!isTimestamp(dateStr)) {
+    return 0;
   }
-  return 0;
+  
+  const timePart = dateStr.split("T")[1];
+  if (!timePart) {
+    return 0;
+  }
+  
+  const parts = timePart.split(":");
+  if (parts.length < 2) {
+    return 0;
+  }
+  
+  const minutes = parseInt(parts[1], 10);
+  if (isNaN(minutes) || minutes < 0 || minutes > 59) {
+    return 0;
+  }
+  
+  return minutes;
 }
 
 /**
