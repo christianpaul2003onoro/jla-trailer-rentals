@@ -38,6 +38,11 @@ export default async function handler(
     phone,
     towing_vehicle,
     comments,
+
+    // 🔵 NEW FIELDS COMING FROM BOOKING FORM
+    cargo_type,
+    cargo_description,
+    towing_insured,
   } = (req.body ?? {}) as Record<string, any>;
 
   const bad = (field: string, msg: string, status = 400) =>
@@ -130,6 +135,11 @@ export default async function handler(
     delivery_requested: !!delivery_requested,
     status: "Pending",
     access_key_hash,
+
+    // 🔵 NEW FIELDS STORED IN BOOKINGS TABLE
+    towing_insured: !!towing_insured,
+    cargo_type: cargo_type || null,
+    cargo_description: cargo_description || null,
   });
 
   if (bookErr) {
