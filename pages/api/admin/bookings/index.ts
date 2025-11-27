@@ -31,6 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
       payment_link_sent_at,
       close_outcome,
       close_reason,
+      towing_insured,
+      cargo_type,
+      cargo_description,
       trailer_id,
       trailers:trailers(name),
       clients:clients(first_name,last_name,email)
