@@ -19,7 +19,8 @@ type Out = Ok | Err;
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY as string | undefined;
 const FROM_EMAIL =
-  process.env.RESEND_FROM || "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
+  process.env.RESEND_FROM ||
+  "JLA Trailer Rentals <no-reply@send.jlatrailers.com>";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 // Explicit union type for the helper result
@@ -66,7 +67,8 @@ export default async function handler(
 
   if (req.method === "GET") {
     const got = await getJoinedRow(id);
-    if ("error" in got) return res.status(400).json({ ok: false, error: got.error });
+    if ("error" in got)
+      return res.status(400).json({ ok: false, error: got.error });
     return res.status(200).json({ ok: true, row: got.row });
   }
 
@@ -116,7 +118,10 @@ export default async function handler(
 
         // Google Calendar: update event dates (best effort)
         try {
-          const eventId = updated.calendar_event_id as string | null | undefined;
+          const eventId = updated.calendar_event_id as
+            | string
+            | null
+            | undefined;
           if (eventId) {
             const client = Array.isArray(updated.clients)
               ? updated.clients[0]
@@ -126,17 +131,21 @@ export default async function handler(
               : updated.trailers;
 
             const clientName =
-              [client?.first_name, client?.last_name].filter(Boolean).join(" ") ||
-              null;
+              [client?.first_name, client?.last_name]
+                .filter(Boolean)
+                .join(" ") || null;
             const trailerName = trailer?.name ?? null;
 
-            await updateCalendarEvent(eventId, {
-              rental_id: updated.rental_id as string,
-              trailerName,
-              clientName,
-              startDate: updated.start_date as string,
-              endDate: updated.end_date as string,
-              delivery: !!updated.delivery_requested,
+            // 🔹 NEW: match updateCalendarEvent({ eventId, booking })
+            await updateCalendarEvent({
+              eventId,
+              booking: {
+                rentalId: updated.rental_id as string,
+                trailerName,
+                customerName: clientName,
+                startDate: updated.start_date as string,
+                endDate: updated.end_date as string,
+              },
             });
           }
         } catch (e) {
@@ -226,7 +235,10 @@ export default async function handler(
 
         // Google Calendar: delete event + clear pointer (best effort)
         try {
-          const eventId = updated.calendar_event_id as string | null | undefined;
+          const eventId = updated.calendar_event_id as
+            | string
+            | null
+            | undefined;
           if (eventId) {
             try {
               await deleteCalendarEvent(eventId);
