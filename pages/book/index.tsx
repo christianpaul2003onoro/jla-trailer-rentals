@@ -512,28 +512,38 @@ export default function BookPage() {
             )}
           </label>
 
-          {/* Towing Vehicle + Insured Checkbox */}
+          {/* Towing vehicle + insured on the same row */}
 <div
   style={{
     gridColumn: "1 / span 2",
-    display: "grid",
-    gridTemplateColumns: "1fr auto",
+    display: "flex",
+    alignItems: "flex-end",
     gap: 16,
-    alignItems: "end",
   }}
 >
-  {/* Towing vehicle input - SAME SIZE AS PHONE */}
-  <label style={{ display: "grid", gap: 8 }}>
-    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Towing Vehicle</span>
+  {/* Towing vehicle input – half width (same feel as Phone) */}
+  <label
+    style={{
+      flex: "0 0 50%", // half of the form width
+      display: "grid",
+      gap: 8,
+    }}
+  >
+    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+      Towing Vehicle
+    </span>
     <input
       value={vehicle}
       onChange={(e) => setVehicle(e.target.value)}
       placeholder="e.g., Ford F-150"
-      style={inputStyle}
+      style={{
+        ...inputStyle,
+        width: "100%",
+      }}
     />
   </label>
 
-  {/* Insured checkbox (blue) */}
+  {/* Towing vehicle insured checkbox (custom, blue) */}
   <label
     style={{
       display: "flex",
@@ -541,10 +551,9 @@ export default function BookPage() {
       gap: 10,
       cursor: "pointer",
       userSelect: "none",
-      paddingBottom: 6,
-      whiteSpace: "nowrap",
     }}
   >
+    {/* Real checkbox (hidden) */}
     <input
       type="checkbox"
       checked={towingInsured}
@@ -558,37 +567,41 @@ export default function BookPage() {
       }}
     />
 
+    {/* Custom box */}
     <div
       style={{
-        width: 20,
-        height: 20,
-        borderRadius: 6,
-        border: "2px solid #64748b",
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        border: "1px solid #64748b",
         backgroundColor: towingInsured ? "#3b82f6" : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        transition: "0.2s",
+        boxShadow: towingInsured
+          ? "0 0 0 2px rgba(59,130,246,0.35)"
+          : "none",
+        transition: "background-color 0.15s, box-shadow 0.15s",
+        fontSize: 13,
+        color: "#0b1220",
+        fontWeight: 700,
       }}
     >
-      {towingInsured && (
-        <span
-          style={{
-            color: "#0b1220",
-            fontWeight: 700,
-            fontSize: 14,
-          }}
-        >
-          ✓
-        </span>
-      )}
+      {towingInsured ? "✓" : null}
     </div>
 
-    <span style={{ color: "#e5e7eb", fontSize: 15 }}>
+    <span style={{ color: "#e5e7eb" }}>
       Towing vehicle is fully insured
     </span>
   </label>
 </div>
+
+{errors.towingInsured && (
+  <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>
+    {errors.towingInsured}
+  </div>
+)}
+
 
           {errors.towingInsured && (
             <div
