@@ -72,8 +72,10 @@ function getCalendarClient(): calendar_v3.Calendar {
     throw new Error("Google service account env vars not configured.");
   }
 
-  // Replace escaped newlines with actual newlines (common when storing PEM keys in env vars)
-  const formattedKey = SERVICE_ACCOUNT_KEY.replace(/\\n/g, "\n");
+  // Format the private key:
+  // 1. Replace escaped newlines with actual newlines (common when storing PEM keys in env vars)
+  // 2. Trim leading/trailing whitespace and newlines that may be added around the key
+  const formattedKey = SERVICE_ACCOUNT_KEY.replace(/\\n/g, "\n").trim();
 
   // Validate key format without exposing sensitive data
   const hasBeginMarker = formattedKey.includes("-----BEGIN");
