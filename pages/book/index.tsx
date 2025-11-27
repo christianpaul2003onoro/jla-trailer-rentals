@@ -494,22 +494,58 @@ export default function BookPage() {
             />
           </label>
 
-          {/* Towing vehicle insured checkbox */}
-          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input
-              type="checkbox"
-              checked={towingInsured}
-              onChange={(e) => setTowingInsured(e.target.checked)}
-            />
-            <span style={{ color: "#e5e7eb" }}>
-              I confirm the towing vehicle is fully insured.
-            </span>
-          </label>
-          {errors.towingInsured && (
-            <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>
-              {errors.towingInsured}
-            </div>
-          )}
+          {/* Towing vehicle insured checkbox (custom styled) */}
+<label
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    cursor: "pointer",
+    userSelect: "none",
+  }}
+>
+  {/* Visually hidden real checkbox for accessibility */}
+  <input
+    type="checkbox"
+    checked={towingInsured}
+    onChange={(e) => setTowingInsured(e.target.checked)}
+    style={{
+      position: "absolute",
+      opacity: 0,
+      pointerEvents: "none",
+      width: 0,
+      height: 0,
+    }}
+  />
+
+  {/* Custom checkbox UI */}
+  <div
+    style={{
+      width: 18,
+      height: 18,
+      borderRadius: 4,
+      border: "1px solid #64748b",
+      backgroundColor: towingInsured ? "#22c55e" : "transparent",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      boxShadow: towingInsured ? "0 0 0 2px rgba(34,197,94,0.35)" : "none",
+      transition: "background-color 0.15s, box-shadow 0.15s",
+      fontSize: 13,
+      color: "#0b1220",
+      fontWeight: 700,
+    }}
+  >
+    {towingInsured ? "✓" : null}
+  </div>
+
+  <span style={{ color: "#e5e7eb" }}>Towing vehicle is fully insured</span>
+</label>
+{errors.towingInsured && (
+  <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>
+    {errors.towingInsured}
+  </div>
+)}
 
           {/* Cargo Hauled */}
           <div style={{ gridColumn: "1 / span 2", display: "grid", gap: 10 }}>
@@ -517,33 +553,125 @@ export default function BookPage() {
               Cargo Hauled
             </span>
 
-            {/* Radio buttons */}
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <label
-                style={{ display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <input
-                  type="radio"
-                  name="cargoType"
-                  value="vehicle"
-                  checked={cargoType === "vehicle"}
-                  onChange={() => setCargoType("vehicle")}
-                />
-                <span style={{ color: "#e5e7eb" }}>Vehicle</span>
-              </label>
-              <label
-                style={{ display: "flex", alignItems: "center", gap: 6 }}
-              >
-                <input
-                  type="radio"
-                  name="cargoType"
-                  value="load"
-                  checked={cargoType === "load"}
-                  onChange={() => setCargoType("load")}
-                />
-                <span style={{ color: "#e5e7eb" }}>Load</span>
-              </label>
-            </div>
+            {/* Radio buttons (custom styled) */}
+<div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+  {/* Vehicle */}
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      userSelect: "none",
+    }}
+  >
+    {/* Hidden real radio */}
+    <input
+      type="radio"
+      name="cargoType"
+      value="vehicle"
+      checked={cargoType === "vehicle"}
+      onChange={() => setCargoType("vehicle")}
+      style={{
+        position: "absolute",
+        opacity: 0,
+        pointerEvents: "none",
+        width: 0,
+        height: 0,
+      }}
+    />
+
+    {/* Custom circle */}
+    <div
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        border: "2px solid #64748b",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow:
+          cargoType === "vehicle"
+            ? "0 0 0 2px rgba(59,130,246,0.35)"
+            : "none",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}
+    >
+      {cargoType === "vehicle" && (
+        <div
+          style={{
+            width: 9,
+            height: 9,
+            borderRadius: "50%",
+            backgroundColor: "#3b82f6",
+          }}
+        />
+      )}
+    </div>
+
+    <span style={{ color: "#e5e7eb" }}>Vehicle</span>
+  </label>
+
+  {/* Load */}
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      userSelect: "none",
+    }}
+  >
+    {/* Hidden real radio */}
+    <input
+      type="radio"
+      name="cargoType"
+      value="load"
+      checked={cargoType === "load"}
+      onChange={() => setCargoType("load")}
+      style={{
+        position: "absolute",
+        opacity: 0,
+        pointerEvents: "none",
+        width: 0,
+        height: 0,
+      }}
+    />
+
+    {/* Custom circle */}
+    <div
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        border: "2px solid #64748b",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow:
+          cargoType === "load"
+            ? "0 0 0 2px rgba(59,130,246,0.35)"
+            : "none",
+        transition: "box-shadow 0.15s, border-color 0.15s",
+      }}
+    >
+      {cargoType === "load" && (
+        <div
+          style={{
+            width: 9,
+            height: 9,
+            borderRadius: "50%",
+            backgroundColor: "#3b82f6",
+          }}
+        />
+      )}
+    </div>
+
+    <span style={{ color: "#e5e7eb" }}>Load</span>
+  </label>
+</div>
+
             {errors.cargoType && (
               <small style={{ color: "#fca5a5" }}>{errors.cargoType}</small>
             )}
