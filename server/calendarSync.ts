@@ -1,132 +1,97 @@
 // server/calendarSync.ts
+// Simple helper: create an all-day Google Calendar event when a booking is approved.
+
 import { google } from "googleapis";
 
-/**
- * Normalize private key from environment:
- * Vercel stores multiline keys as \n — we must convert them.
- */
-function normalizePrivateKey(key?: string) {
-  if (!key) return "";
-  return key.replace(/\\n/g, "\n");
-}
+const SA_JSON = process.env.GOOGLE_SERVICE_ACCOUNT;
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
+const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || "America/New_York";
 
-// ---------- Load ENV Vars ----------
-const serviceEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const privateKey = normalizePrivateKey(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY);
-const calendarId = process.env.GOOGLE_CALENDAR_ID;
-
-// ---------- Validate ----------
-if (!serviceEmail) console.error("[CalendarSync] Missing GOOGLE_SERVICE_ACCOUNT_EMAIL");
-if (!privateKey) console.error("[CalendarSync] Missing GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY");
-if (!calendarId) console.error("[CalendarSync] Missing GOOGLE_CALENDAR_ID");
-
-// ---------- Auth Client ----------
 function getCalendarClient() {
-  const jwt = new google.auth.JWT({
-    email: serviceEmail,
-    key: privateKey,
-    scopes: ["https://www.googleapis.com/auth/calendar"],
-  });
-
-  return google.calendar({ version: "v3", auth: jwt });
-}
-
-// ========================================================
-//  CREATE EVENT
-// ========================================================
-export async function createCalendarEventForBooking({
-  rental_id,
-  trailerName,
-  clientName,
-  startDate,
-  endDate,
-  delivery,
-}: {
-  rental_id: string;
-  trailerName: string;
-  clientName: string;
-  startDate: string; // "YYYY-MM-DD"
-  endDate: string;   // "YYYY-MM-DD"
-  delivery: boolean;
-}) {
-  try {
-    const calendar = getCalendarClient();
-
-    const event = {
-      summary: `${clientName} · ${trailerName} · ${rental_id}`,
-      description:
-        `Booking ID: ${rental_id}\nClient: ${clientName}\nTrailer: ${trailerName}\nDelivery: ${delivery ? "Yes" : "No"}`,
-      start: { date: startDate },
-      end: { date: endDate },
-    };
-
-    const response = await calendar.events.insert({
-      calendarId,
-      requestBody: event,
-    });
-
-    const eventId = response.data.id;
-    return eventId || null;
-  } catch (err: any) {
-    console.error("[CalendarSync] create event error:", err.response?.data || err);
+  if (!SA_JSON || !CALENDAR_ID) {
+    console.warn(
+      "[calendarSync] Missing GOOGLE_SERVICE_ACCOUNT or GOOGLE_CALENDAR_ID – skipping sync."
+    );
     return null;
   }
+
+  let creds: { client_email: string; private_key: string };
+  try {
+    creds = JSON.parse(SA_JSON);
+  } catch (e) {
+    console.error("[calendarSync] Failed to parse GOOGLE_SERVICE_ACCOUNT JSON", e);
+    return null;
+  }
+
+  const jwt = new google.auth.JWT(
+    creds.client_email,
+    undefined,
+    creds.private_key,
+    ["https://www.googleapis.com/auth/calendar"]
+  );
+
+  const calendar = google.calendar({ version: "v3", auth: jwt });
+  return { calendar, calendarId: CALENDAR_ID, timezone: TIMEZONE };
 }
 
-// ========================================================
-//  UPDATE EVENT
-// ========================================================
-export async function updateCalendarEvent({
-  eventId,
-  rental_id,
-  trailerName,
-  clientName,
-  startDate,
-  endDate,
-  delivery,
-}: {
-  eventId: string;
-  rental_id: string;
-  trailerName: string;
-  clientName: string;
-  startDate: string;
-  endDate: string;
-  delivery: boolean;
-}) {
+export type CalendarBookingPayload = {
+  rentalId: string;
+  trailerName: string | null;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;   // "YYYY-MM-DD"
+  customerName: string;
+};
+
+function addOneDay(isoDate: string): string {
+  const d = new Date(isoDate + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function createCalendarEventForBooking(
+  booking: CalendarBookingPayload
+): Promise<void> {
+  const client = getCalendarClient();
+  if (!client) return; // silently skip if misconfigured
+
+  const { calendar, calendarId, timezone } = client;
+
+  const titleParts = [
+    booking.customerName || "Customer",
+    booking.trailerName || "Trailer",
+    booking.rentalId,
+  ];
+  const summary = titleParts.join(" · ");
+
+  const descriptionLines = [
+    `Rental: ${booking.rentalId}`,
+    booking.trailerName ? `Trailer: ${booking.trailerName}` : "",
+    `Customer: ${booking.customerName}`,
+    "",
+    "Created automatically from JLA website (status: Approved).",
+  ].filter(Boolean);
+
+  // All-day event: Google uses end.date as exclusive, so add 1 day
+  const event = {
+    summary,
+    description: descriptionLines.join("\n"),
+    start: {
+      date: booking.startDate,
+      timeZone: timezone,
+    },
+    end: {
+      date: addOneDay(booking.endDate),
+      timeZone: timezone,
+    },
+  };
+
   try {
-    const calendar = getCalendarClient();
-
-    const event = {
-      summary: `${clientName} · ${trailerName} · ${rental_id}`,
-      description:
-        `Booking ID: ${rental_id}\nClient: ${clientName}\nTrailer: ${trailerName}\nDelivery: ${delivery ? "Yes" : "No"}`,
-      start: { date: startDate },
-      end: { date: endDate },
-    };
-
-    await calendar.events.update({
+    await calendar.events.insert({
       calendarId,
-      eventId,
       requestBody: event,
     });
-
-    return true;
-  } catch (err: any) {
-    console.error("[CalendarSync] update event error:", err.response?.data || err);
-    return false;
-  }
-}
-
-// ========================================================
-//  DELETE EVENT
-// ========================================================
-export async function deleteCalendarEvent(eventId: string) {
-  try {
-    const calendar = getCalendarClient();
-    await calendar.events.delete({ calendarId, eventId });
-    return true;
-  } catch (err: any) {
-    console.error("[CalendarSync] delete event error:", err.response?.data || err);
-    return false;
+    console.log("[calendarSync] Event created for", booking.rentalId);
+  } catch (e) {
+    console.error("[calendarSync] Failed to create event", e);
   }
 }
