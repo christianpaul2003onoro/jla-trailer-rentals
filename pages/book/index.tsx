@@ -521,27 +521,25 @@ export default function BookPage() {
     gap: 16,
   }}
 >
-  {/* Towing vehicle input – half width (same feel as Phone) */}
-  <label
-    style={{
-      flex: "0 0 50%", // half of the form width
-      display: "grid",
-      gap: 8,
-    }}
-  >
-    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-      Towing Vehicle
-    </span>
-    <input
-      value={vehicle}
-      onChange={(e) => setVehicle(e.target.value)}
-      placeholder="e.g., Ford F-150"
-      style={{
-        ...inputStyle,
-        width: "100%",
-      }}
-    />
-  </label>
+  {/* Towing vehicle (same visual “weight” as Phone field) */}
+<label
+  style={{
+    display: "grid",
+    gap: 8,
+    maxWidth: 460, // keep it similar to Phone field, not super long
+  }}
+>
+  <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+    Towing Vehicle
+  </span>
+  <input
+    value={vehicle}
+    onChange={(e) => setVehicle(e.target.value)}
+    placeholder="e.g., Ford F-150"
+    style={inputStyle}
+  />
+</label>
+
 
   {/* Towing vehicle insured checkbox (custom, blue) */}
   <label
@@ -738,45 +736,58 @@ export default function BookPage() {
 
             {/* Description based on selection */}
             {cargoType && (
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-                  {cargoType === "vehicle" ? "Vehicle details" : "Load details"}
-                </span>
-                <textarea
-                  value={cargoDescription}
-                  onChange={(e) => setCargoDescription(e.target.value)}
-                  placeholder={
-                    cargoType === "vehicle"
-                      ? "e.g., 2022 Tesla Model 3, sedan"
-                      : "e.g., 6 pallets of tile, approx 5,000 lb"
-                  }
-                  rows={3}
-                  style={{ ...inputStyle, resize: "vertical" }}
-                />
-                {errors.cargoDescription && (
-                  <small style={{ color: "#fca5a5" }}>
-                    {errors.cargoDescription}
-                  </small>
-                )}
-              </label>
-            )}
+  <label
+    style={{
+      display: "grid",
+      gap: 8,
+      maxWidth: 480, // small, just for a short car/load description
+    }}
+  >
+    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+      {cargoType === "vehicle" ? "Vehicle details" : "Load details"}
+    </span>
+    <textarea
+      value={cargoDescription}
+      onChange={(e) => setCargoDescription(e.target.value)}
+      placeholder={
+        cargoType === "vehicle"
+          ? "e.g., 2022 Tesla Model 3, sedan"
+          : "e.g., 6 pallets of tile, approx 5,000 lb"
+      }
+      rows={2} // smaller box – not a big paragraph field
+      style={{ ...inputStyle, resize: "vertical" }}
+    />
+    {errors.cargoDescription && (
+      <small style={{ color: "#fca5a5" }}>
+        {errors.cargoDescription}
+      </small>
+    )}
+  </label>
+)}
+
           </div>
 
-          {/* Additional Comments */}
-          <label
-            style={{ gridColumn: "1 / span 1", display: "grid", gap: 8 }}
-          >
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-              Additional Comments
-            </span>
-            <textarea
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              placeholder="Any details we should know?"
-              rows={5}
-              style={{ ...inputStyle, resize: "vertical" }}
-            />
-          </label>
+          {/* Additional Comments (smaller, cleaner) */}
+<label
+  style={{
+    gridColumn: "1 / span 1",
+    display: "grid",
+    gap: 6,         // slightly tighter space
+    maxWidth: 520,  // doesn’t stretch forever
+  }}
+>
+  <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+    Additional Comments
+  </span>
+  <textarea
+    value={comments}
+    onChange={(e) => setComments(e.target.value)}
+    placeholder="Any details we should know?"
+    rows={3} // smaller height
+    style={{ ...inputStyle, resize: "vertical" }}
+  />
+</label>
+
 
           {/* Quote preview */}
           <div
