@@ -158,12 +158,10 @@ export default function BookPage() {
     if (!email.trim()) e.email = "Enter your email.";
     if (!phone.trim()) e.phone = "Enter your phone.";
 
-    // NEW: cargo + towing insurance validation
+    // NEW: cargo validation (towingInsured is informational only, not required)
     if (!cargoType) e.cargoType = "Please select what you will be hauling.";
     if (!cargoDescription.trim())
       e.cargoDescription = "Please describe the vehicle or load you will haul.";
-    if (!towingInsured)
-      e.towingInsured = "You must confirm that the towing vehicle is fully insured.";
 
     if (isAvailable === false)
       e.dates =
@@ -597,24 +595,6 @@ export default function BookPage() {
   </label>
 </div>
 
-{errors.towingInsured && (
-  <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>
-    {errors.towingInsured}
-  </div>
-)}
-
-
-          {errors.towingInsured && (
-            <div
-              style={{
-                gridColumn: "1 / span 2",
-                color: "#fca5a5",
-                textAlign: "left",
-              }}
-            >
-              {errors.towingInsured}
-            </div>
-          )}
 
           {/* Cargo Hauled */}
           <div style={{ gridColumn: "1 / span 2", display: "grid", gap: 10 }}>
