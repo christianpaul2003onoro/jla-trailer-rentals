@@ -8,6 +8,10 @@ import {
   finishedHTML,
   cancelledHTML,
 } from "../../../../server/emailTemplates";
+import {
+  updateCalendarEvent,
+  deleteCalendarEvent,
+} from "../../../../server/calendarSync";
 
 type Ok = { ok: true; row?: any };
 type Err = { ok: false; error: string };
@@ -27,7 +31,21 @@ async function getJoinedRow(id: string): Promise<JoinedRow> {
     .from("bookings")
     .select(
       `
-      id,rental_id,status,start_date,end_date,delivery_requested,created_at,paid_at,approved_at,payment_link,payment_link_sent_at,close_outcome,close_reason,trailer_id,
+      id,
+      rental_id,
+      status,
+      start_date,
+      end_date,
+      delivery_requested,
+      created_at,
+      paid_at,
+      approved_at,
+      payment_link,
+      payment_link_sent_at,
+      close_outcome,
+      close_reason,
+      trailer_id,
+      calendar_event_id,
       trailers:trailers(name),
       clients:clients(first_name,last_name,email)
     `
@@ -69,7 +87,21 @@ export default async function handler(
           .eq("id", id)
           .select(
             `
-            id,rental_id,status,start_date,end_date,delivery_requested,created_at,paid_at,approved_at,payment_link,payment_link_sent_at,close_outcome,close_reason,trailer_id,
+            id,
+            rental_id,
+            status,
+            start_date,
+            end_date,
+            delivery_requested,
+            created_at,
+            paid_at,
+            approved_at,
+            payment_link,
+            payment_link_sent_at,
+            close_outcome,
+            close_reason,
+            trailer_id,
+            calendar_event_id,
             trailers:trailers(name),
             clients:clients(first_name,last_name,email)
           `
@@ -77,14 +109,49 @@ export default async function handler(
           .single();
 
         if (updErr || !updated) {
-          return res.status(500).json({ ok: false, error: updErr?.message || "Update failed" });
+          return res
+            .status(500)
+            .json({ ok: false, error: updErr?.message || "Update failed" });
+        }
+
+        // Google Calendar: update event dates (best effort)
+        try {
+          const eventId = updated.calendar_event_id as string | null | undefined;
+          if (eventId) {
+            const client = Array.isArray(updated.clients)
+              ? updated.clients[0]
+              : updated.clients;
+            const trailer = Array.isArray(updated.trailers)
+              ? updated.trailers[0]
+              : updated.trailers;
+
+            const clientName =
+              [client?.first_name, client?.last_name].filter(Boolean).join(" ") ||
+              null;
+            const trailerName = trailer?.name ?? null;
+
+            await updateCalendarEvent(eventId, {
+              rental_id: updated.rental_id as string,
+              trailerName,
+              clientName,
+              startDate: updated.start_date as string,
+              endDate: updated.end_date as string,
+              delivery: !!updated.delivery_requested,
+            });
+          }
+        } catch (e) {
+          console.error("CALENDAR_SYNC_RESCHEDULE_ERROR", e);
         }
 
         // notify customer (best effort) using the branded template
         try {
           if (resend && FROM_EMAIL) {
-            const client = Array.isArray(updated.clients) ? updated.clients[0] : updated.clients;
-            const trailer = Array.isArray(updated.trailers) ? updated.trailers[0] : updated.trailers;
+            const client = Array.isArray(updated.clients)
+              ? updated.clients[0]
+              : updated.clients;
+            const trailer = Array.isArray(updated.trailers)
+              ? updated.trailers[0]
+              : updated.trailers;
             const to = client?.email as string | undefined;
 
             if (to) {
@@ -108,7 +175,7 @@ export default async function handler(
             }
           }
         } catch {
-          /* ignore */
+          /* ignore email errors */
         }
 
         return res.status(200).json({ ok: true, row: updated });
@@ -130,7 +197,21 @@ export default async function handler(
           .eq("id", id)
           .select(
             `
-            id,rental_id,status,start_date,end_date,delivery_requested,created_at,paid_at,approved_at,payment_link,payment_link_sent_at,close_outcome,close_reason,trailer_id,
+            id,
+            rental_id,
+            status,
+            start_date,
+            end_date,
+            delivery_requested,
+            created_at,
+            paid_at,
+            approved_at,
+            payment_link,
+            payment_link_sent_at,
+            close_outcome,
+            close_reason,
+            trailer_id,
+            calendar_event_id,
             trailers:trailers(name),
             clients:clients(first_name,last_name,email)
           `
@@ -138,14 +219,39 @@ export default async function handler(
           .single();
 
         if (updErr || !updated) {
-          return res.status(500).json({ ok: false, error: updErr?.message || "Update failed" });
+          return res
+            .status(500)
+            .json({ ok: false, error: updErr?.message || "Update failed" });
+        }
+
+        // Google Calendar: delete event + clear pointer (best effort)
+        try {
+          const eventId = updated.calendar_event_id as string | null | undefined;
+          if (eventId) {
+            try {
+              await deleteCalendarEvent(eventId);
+            } catch (inner) {
+              console.error("CALENDAR_SYNC_DELETE_ERROR", inner);
+            }
+            // clear the stored ID even if the API delete failed (event may already be gone)
+            await supabaseAdmin
+              .from("bookings")
+              .update({ calendar_event_id: null })
+              .eq("id", id);
+          }
+        } catch (e) {
+          console.error("CALENDAR_SYNC_CLOSE_ERROR", e);
         }
 
         // emails (best effort), using the split templates
         try {
           if (resend && FROM_EMAIL) {
-            const client = Array.isArray(updated.clients) ? updated.clients[0] : updated.clients;
-            const trailer = Array.isArray(updated.trailers) ? updated.trailers[0] : updated.trailers;
+            const client = Array.isArray(updated.clients)
+              ? updated.clients[0]
+              : updated.clients;
+            const trailer = Array.isArray(updated.trailers)
+              ? updated.trailers[0]
+              : updated.trailers;
             const to = client?.email as string | undefined;
 
             // Finished: send “Thank you” email only if checkbox requested
@@ -186,7 +292,7 @@ export default async function handler(
             }
           }
         } catch {
-          /* ignore */
+          /* ignore email errors */
         }
 
         return res.status(200).json({ ok: true, row: updated });
@@ -195,7 +301,9 @@ export default async function handler(
       // Fallback – nothing matched
       return res.status(400).json({ ok: false, error: "Invalid PATCH body." });
     } catch (e: any) {
-      return res.status(500).json({ ok: false, error: e?.message || "Server error" });
+      return res
+        .status(500)
+        .json({ ok: false, error: e?.message || "Server error" });
     }
   }
 
