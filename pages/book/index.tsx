@@ -521,24 +521,27 @@ export default function BookPage() {
     gap: 16,
   }}
 >
-  {/* Towing vehicle (same visual “weight” as Phone field) */}
-<label
-  style={{
-    display: "grid",
-    gap: 8,
-    maxWidth: 460, // keep it similar to Phone field, not super long
-  }}
->
-  <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-    Towing Vehicle
-  </span>
-  <input
-    value={vehicle}
-    onChange={(e) => setVehicle(e.target.value)}
-    placeholder="e.g., Ford F-150"
-    style={inputStyle}
-  />
-</label>
+  {/* Towing vehicle input – half width (same feel as Phone) */}
+  <label
+    style={{
+      flex: "0 0 50%", // half of the form width
+      display: "grid",
+      gap: 8,
+    }}
+  >
+    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+      Towing Vehicle
+    </span>
+    <input
+      value={vehicle}
+      onChange={(e) => setVehicle(e.target.value)}
+      placeholder="e.g., Ford F-150"
+      style={{
+        ...inputStyle,
+        width: "100%",
+      }}
+    />
+  </label>
 
 
   {/* Towing vehicle insured checkbox (custom, blue) */}
@@ -767,13 +770,14 @@ export default function BookPage() {
 
           </div>
 
-          {/* Additional Comments (smaller, cleaner) */}
+          {/* Additional Comments (compact) */}
 <label
   style={{
     gridColumn: "1 / span 1",
     display: "grid",
-    gap: 6,         // slightly tighter space
-    maxWidth: 520,  // doesn’t stretch forever
+    gap: 4,          // almost no space between label + box
+    maxWidth: 460,   // clearly smaller width
+    alignSelf: "start",
   }}
 >
   <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
@@ -783,10 +787,11 @@ export default function BookPage() {
     value={comments}
     onChange={(e) => setComments(e.target.value)}
     placeholder="Any details we should know?"
-    rows={3} // smaller height
+    rows={2}         // short box (not a giant paragraph area)
     style={{ ...inputStyle, resize: "vertical" }}
   />
 </label>
+
 
 
           {/* Quote preview */}
