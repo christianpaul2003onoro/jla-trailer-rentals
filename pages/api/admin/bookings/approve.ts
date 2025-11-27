@@ -1,11 +1,11 @@
-//pages/api/admin/bookings/approve.ts
+// pages/api/admin/bookings/approve.ts
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdmin } from "../../../../server/adminauth";
 import { bookingApprovedHTML } from "../../../../server/emailTemplates";
-import { createCalendarEventForBooking } from "../../../../server/calendarSync";
+import { createCalendarEvent } from "../../../../server/calendarSync";
 
 /* ---------- ENV & CLIENTS ---------- */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
@@ -73,8 +73,16 @@ export default async function handler(
     .from("bookings")
     .select(
       `
-      id, rental_id, status, start_date, end_date,
-      payment_link, payment_link_sent_at, approved_at,
+      id,
+      rental_id,
+      status,
+      start_date,
+      end_date,
+      delivery_requested,
+      payment_link,
+      payment_link_sent_at,
+      approved_at,
+      calendar_event_id,
       clients:clients ( email, first_name, last_name ),
       trailers:trailers ( name )
     `
@@ -92,7 +100,26 @@ export default async function handler(
   const customerEmail = clientRec?.email;
   if (!customerEmail) return bad(res, 400, "Booking has no customer email");
 
-  // 2) Update → Approved + link + timestamps
+  const customerName =
+    [clientRec?.first_name, clientRec?.last_name].filter(Boolean).join(" ") ||
+    "Client";
+
+  // 2) Google Calendar: create event (best effort)
+  let calendarEventId: string | null = null;
+  try {
+    calendarEventId = await createCalendarEvent({
+      rentalId: booking.rental_id as string,
+      trailerName: trailerRec?.name ?? null,
+      customerName,
+      startDate: booking.start_date as string,
+      endDate: booking.end_date as string,
+      delivery: !!booking.delivery_requested,
+    });
+  } catch (e) {
+    console.error("CALENDAR_CREATE_ON_APPROVE_ERROR", e);
+  }
+
+  // 3) Update → Approved + link + timestamps (+ calendar_event_id if we got one)
   const nowISO = new Date().toISOString();
   const { data: updated, error: updErr } = await supabase
     .from("bookings")
@@ -101,12 +128,26 @@ export default async function handler(
       payment_link: paymentLink,
       approved_at: nowISO,
       payment_link_sent_at: nowISO,
+      calendar_event_id: calendarEventId ?? booking.calendar_event_id ?? null,
     })
     .eq("id", bookingId)
     .select(
       `
-      id, rental_id, status, start_date, end_date,
-      payment_link, payment_link_sent_at, approved_at,
+      id,
+      rental_id,
+      status,
+      start_date,
+      end_date,
+      delivery_requested,
+      created_at,
+      paid_at,
+      approved_at,
+      payment_link,
+      payment_link_sent_at,
+      close_outcome,
+      close_reason,
+      trailer_id,
+      calendar_event_id,
       clients:clients ( email, first_name, last_name ),
       trailers:trailers ( name )
     `
@@ -115,12 +156,12 @@ export default async function handler(
 
   if (updErr || !updated) return bad(res, 500, "Failed to update booking");
 
-  const updatedClient = first<{ email?: string; first_name?: string; last_name?: string }>(
+  const updatedClient = first<{ email?: string; first_name?: string }>(
     updated.clients as any
   );
   const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
 
-  // 3) Send “Approved + Pay & Confirm” email using the branded template
+  // 4) Send “Approved + Pay & Confirm” email
   const subject = `Approved — ${updated.rental_id}`;
   const html = bookingApprovedHTML({
     firstName: updatedClient?.first_name ?? null,
@@ -145,24 +186,6 @@ export default async function handler(
       emailSent: false,
       emailError: e?.message || "Failed to send email",
     });
-  }
-
-  // 4) Create Google Calendar event (best effort, non-blocking)
-  try {
-    const customerName = `${
-      updatedClient?.first_name ?? ""
-    } ${updatedClient?.last_name ?? ""}`.trim() || "Customer";
-
-    await createCalendarEventForBooking({
-      rentalId: updated.rental_id,
-      trailerName: updatedTrailer?.name ?? null,
-      startDate: updated.start_date,
-      endDate: updated.end_date,
-      customerName,
-    });
-  } catch (e) {
-    console.error("CALENDAR_EVENT_ERROR", e);
-    // Do not fail the request if calendar fails
   }
 
   return ok(res, { row: updated, emailSent: true });
