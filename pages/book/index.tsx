@@ -512,25 +512,24 @@ export default function BookPage() {
             )}
           </label>
 
-          <div
+          {/* Towing Vehicle + Insured Checkbox */}
+<div
   style={{
     gridColumn: "1 / span 2",
     display: "grid",
-    gridTemplateColumns: "70% 30%",
-    columnGap: 16,
+    gridTemplateColumns: "1fr auto",
+    gap: 16,
     alignItems: "end",
   }}
 >
-  {/* Towing vehicle input */}
+  {/* Towing vehicle input - SAME SIZE AS PHONE */}
   <label style={{ display: "grid", gap: 8 }}>
-    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-      Towing Vehicle
-    </span>
+    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Towing Vehicle</span>
     <input
       value={vehicle}
       onChange={(e) => setVehicle(e.target.value)}
       placeholder="e.g., Ford F-150"
-      style={{ ...inputStyle }}
+      style={inputStyle}
     />
   </label>
 
@@ -543,6 +542,7 @@ export default function BookPage() {
       cursor: "pointer",
       userSelect: "none",
       paddingBottom: 6,
+      whiteSpace: "nowrap",
     }}
   >
     <input
@@ -564,7 +564,7 @@ export default function BookPage() {
         height: 20,
         borderRadius: 6,
         border: "2px solid #64748b",
-        backgroundColor: towingInsured ? "#3b82f6" : "transparent",  // BLUE
+        backgroundColor: towingInsured ? "#3b82f6" : "transparent",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -589,6 +589,7 @@ export default function BookPage() {
     </span>
   </label>
 </div>
+
           {errors.towingInsured && (
             <div
               style={{
