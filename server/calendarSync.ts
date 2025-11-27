@@ -1,11 +1,19 @@
 // server/calendarSync.ts
-// Simple helper: create an all-day Google Calendar event when a booking is approved.
+// Google Calendar helper for JLA bookings.
+// - createCalendarEventForBooking: when a booking is Approved
+// - updateCalendarEvent: when a booking is rescheduled
+// - deleteCalendarEvent: when a booking is cancelled/closed (optional)
 
 import { google } from "googleapis";
 
 const SA_JSON = process.env.GOOGLE_SERVICE_ACCOUNT;
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID;
 const TIMEZONE = process.env.GOOGLE_CALENDAR_TIMEZONE || "America/New_York";
+
+type ServiceAccountCreds = {
+  client_email: string;
+  private_key: string;
+};
 
 function getCalendarClient() {
   if (!SA_JSON || !CALENDAR_ID) {
@@ -15,11 +23,14 @@ function getCalendarClient() {
     return null;
   }
 
-  let creds: { client_email: string; private_key: string };
+  let creds: ServiceAccountCreds;
   try {
     creds = JSON.parse(SA_JSON);
   } catch (e) {
-    console.error("[calendarSync] Failed to parse GOOGLE_SERVICE_ACCOUNT JSON", e);
+    console.error(
+      "[calendarSync] Failed to parse GOOGLE_SERVICE_ACCOUNT JSON",
+      e
+    );
     return null;
   }
 
@@ -38,7 +49,7 @@ export type CalendarBookingPayload = {
   rentalId: string;
   trailerName: string | null;
   startDate: string; // "YYYY-MM-DD"
-  endDate: string;   // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
   customerName: string;
 };
 
@@ -48,14 +59,7 @@ function addOneDay(isoDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function createCalendarEventForBooking(
-  booking: CalendarBookingPayload
-): Promise<void> {
-  const client = getCalendarClient();
-  if (!client) return; // silently skip if misconfigured
-
-  const { calendar, calendarId, timezone } = client;
-
+function buildEventBody(booking: CalendarBookingPayload, timezone: string) {
   const titleParts = [
     booking.customerName || "Customer",
     booking.trailerName || "Trailer",
@@ -68,11 +72,10 @@ export async function createCalendarEventForBooking(
     booking.trailerName ? `Trailer: ${booking.trailerName}` : "",
     `Customer: ${booking.customerName}`,
     "",
-    "Created automatically from JLA website (status: Approved).",
+    "Created automatically from JLA website.",
   ].filter(Boolean);
 
-  // All-day event: Google uses end.date as exclusive, so add 1 day
-  const event = {
+  return {
     summary,
     description: descriptionLines.join("\n"),
     start: {
@@ -80,18 +83,112 @@ export async function createCalendarEventForBooking(
       timeZone: timezone,
     },
     end: {
+      // Google Calendar all-day end.date is exclusive
       date: addOneDay(booking.endDate),
       timeZone: timezone,
     },
   };
+}
+
+/**
+ * Create a calendar event when a booking is approved.
+ * Returns the Google event ID or null (we ignore this for now).
+ */
+export async function createCalendarEventForBooking(
+  booking: CalendarBookingPayload
+): Promise<string | null> {
+  const client = getCalendarClient();
+  if (!client) return null;
+
+  const { calendar, calendarId, timezone } = client;
+  const eventBody = buildEventBody(booking, timezone);
 
   try {
-    await calendar.events.insert({
+    const resp = await calendar.events.insert({
       calendarId,
-      requestBody: event,
+      requestBody: eventBody,
     });
-    console.log("[calendarSync] Event created for", booking.rentalId);
+    const eventId = resp.data.id ?? null;
+    console.log("[calendarSync] Event created for", booking.rentalId, eventId);
+    return eventId;
   } catch (e) {
     console.error("[calendarSync] Failed to create event", e);
+    return null;
+  }
+}
+
+/**
+ * Update an existing event for reschedule.
+ * If eventId is missing, it will create a new event instead.
+ * Returns the event ID (existing or newly created) or null on failure.
+ */
+export async function updateCalendarEvent(opts: {
+  eventId?: string | null;
+  booking: CalendarBookingPayload;
+}): Promise<string | null> {
+  const client = getCalendarClient();
+  if (!client) return null;
+
+  const { calendar, calendarId, timezone } = client;
+  const eventBody = buildEventBody(opts.booking, timezone);
+
+  try {
+    if (opts.eventId) {
+      const resp = await calendar.events.patch({
+        calendarId,
+        eventId: opts.eventId,
+        requestBody: eventBody,
+      });
+      const id = resp.data.id ?? opts.eventId;
+      console.log(
+        "[calendarSync] Event updated for",
+        opts.booking.rentalId,
+        id
+      );
+      return id;
+    } else {
+      // no stored event id → create a fresh one
+      const resp = await calendar.events.insert({
+        calendarId,
+        requestBody: eventBody,
+      });
+      const id = resp.data.id ?? null;
+      console.log(
+        "[calendarSync] Event created (no previous id) for",
+        opts.booking.rentalId,
+        id
+      );
+      return id;
+    }
+  } catch (e) {
+    console.error("[calendarSync] Failed to update event", e);
+    return null;
+  }
+}
+
+/**
+ * Delete an event when a booking is cancelled/closed.
+ * Safe to call with undefined/null eventId (it will just no-op).
+ */
+export async function deleteCalendarEvent(
+  eventId?: string | null
+): Promise<void> {
+  const client = getCalendarClient();
+  if (!client) return;
+
+  if (!eventId) {
+    console.warn("[calendarSync] deleteCalendarEvent called with no eventId");
+    return;
+  }
+
+  const { calendar, calendarId } = client;
+  try {
+    await calendar.events.delete({
+      calendarId,
+      eventId,
+    });
+    console.log("[calendarSync] Event deleted", eventId);
+  } catch (e) {
+    console.error("[calendarSync] Failed to delete event", e);
   }
 }
