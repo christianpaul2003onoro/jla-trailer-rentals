@@ -1,14 +1,11 @@
-// pages/api/admin/bookings/approve.ts
+//pages/api/admin/bookings/approve.ts
 
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { requireAdmin } from "../../../../server/adminauth";
 import { bookingApprovedHTML } from "../../../../server/emailTemplates";
-import {
-  createCalendarEventForBooking,
-  updateCalendarEvent,
-} from "../../../../server/calendarSync";
+import { createCalendarEventForBooking } from "../../../../server/calendarSync";
 
 /* ---------- ENV & CLIENTS ---------- */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
@@ -76,16 +73,8 @@ export default async function handler(
     .from("bookings")
     .select(
       `
-      id,
-      rental_id,
-      status,
-      start_date,
-      end_date,
-      delivery_requested,
-      payment_link,
-      payment_link_sent_at,
-      approved_at,
-      calendar_event_id,
+      id, rental_id, status, start_date, end_date,
+      payment_link, payment_link_sent_at, approved_at,
       clients:clients ( email, first_name, last_name ),
       trailers:trailers ( name )
     `
@@ -116,16 +105,8 @@ export default async function handler(
     .eq("id", bookingId)
     .select(
       `
-      id,
-      rental_id,
-      status,
-      start_date,
-      end_date,
-      delivery_requested,
-      payment_link,
-      payment_link_sent_at,
-      approved_at,
-      calendar_event_id,
+      id, rental_id, status, start_date, end_date,
+      payment_link, payment_link_sent_at, approved_at,
       clients:clients ( email, first_name, last_name ),
       trailers:trailers ( name )
     `
@@ -138,42 +119,6 @@ export default async function handler(
     updated.clients as any
   );
   const updatedTrailer = first<{ name?: string }>(updated.trailers as any);
-
-  // 2.5) Google Calendar sync (best effort)
-  try {
-    const clientName =
-      [updatedClient?.first_name, updatedClient?.last_name].filter(Boolean).join(" ") ||
-      null;
-    const trailerName = updatedTrailer?.name ?? trailerRec?.name ?? null;
-
-    const basePayload = {
-      rental_id: updated.rental_id as string,
-      trailerName,
-      clientName,
-      startDate: updated.start_date as string, // "YYYY-MM-DD"
-      endDate: updated.end_date as string,     // "YYYY-MM-DD"
-      delivery: !!updated.delivery_requested,
-    };
-
-    let eventId: string | null | undefined = updated.calendar_event_id ?? booking.calendar_event_id;
-
-    if (!eventId) {
-      // first time approval → create event
-      eventId = await createCalendarEventForBooking(basePayload);
-      if (eventId) {
-        await supabase
-          .from("bookings")
-          .update({ calendar_event_id: eventId })
-          .eq("id", bookingId);
-      }
-    } else {
-      // already have event → keep it in sync
-      await updateCalendarEvent(eventId, basePayload);
-    }
-  } catch (e) {
-    console.error("CALENDAR_SYNC_APPROVE_ERROR", e);
-    // do not fail the request if calendar fails
-  }
 
   // 3) Send “Approved + Pay & Confirm” email using the branded template
   const subject = `Approved — ${updated.rental_id}`;
@@ -200,6 +145,24 @@ export default async function handler(
       emailSent: false,
       emailError: e?.message || "Failed to send email",
     });
+  }
+
+  // 4) Create Google Calendar event (best effort, non-blocking)
+  try {
+    const customerName = `${
+      updatedClient?.first_name ?? ""
+    } ${updatedClient?.last_name ?? ""}`.trim() || "Customer";
+
+    await createCalendarEventForBooking({
+      rentalId: updated.rental_id,
+      trailerName: updatedTrailer?.name ?? null,
+      startDate: updated.start_date,
+      endDate: updated.end_date,
+      customerName,
+    });
+  } catch (e) {
+    console.error("CALENDAR_EVENT_ERROR", e);
+    // Do not fail the request if calendar fails
   }
 
   return ok(res, { row: updated, emailSent: true });
