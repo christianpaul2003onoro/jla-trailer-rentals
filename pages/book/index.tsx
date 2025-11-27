@@ -6,6 +6,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+import type React from "react";
 
 import Nav from "../../components/Nav";
 import Footer from "../../components/Footer";
@@ -162,8 +163,7 @@ export default function BookPage() {
     if (!cargoDescription.trim())
       e.cargoDescription = "Please describe the vehicle or load you will haul.";
     if (!towingInsured)
-      e.towingInsured =
-        "You must confirm that the towing vehicle is fully insured.";
+      e.towingInsured = "You must confirm that the towing vehicle is fully insured.";
 
     if (isAvailable === false)
       e.dates =
@@ -260,9 +260,7 @@ export default function BookPage() {
       </Head>
       <Nav />
 
-      <main
-        style={{ maxWidth: 1100, margin: "32px auto", padding: "0 16px" }}
-      >
+      <main style={{ maxWidth: 1100, margin: "32px auto", padding: "0 16px" }}>
         <h1
           style={{
             fontSize: 36,
@@ -364,9 +362,7 @@ export default function BookPage() {
                     padding: "8px 10px",
                   }}
                 >
-                  <div
-                    style={{ fontWeight: 700, marginBottom: 4 }}
-                  >
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
                     Those dates are not available for this trailer.
                   </div>
                   {conflicts.length > 0 && (
@@ -402,20 +398,65 @@ export default function BookPage() {
             </label>
           </div>
 
-          {/* Delivery */}
+          {/* Delivery (custom styled checkbox) */}
           <label
-            style={{ display: "flex", alignItems: "center", gap: 10 }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+              userSelect: "none",
+              padding: "8px 12px",
+              background: "#0f172a",
+              border: "1px solid #1e293b",
+              borderRadius: 10,
+              width: "fit-content",
+            }}
           >
+            {/* Hidden real checkbox */}
             <input
               type="checkbox"
               checked={delivery}
               onChange={(e) => setDelivery(e.target.checked)}
+              style={{
+                position: "absolute",
+                opacity: 0,
+                pointerEvents: "none",
+                width: 0,
+                height: 0,
+              }}
             />
+
+            {/* Custom checkbox */}
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: 6,
+                border: "2px solid #64748b",
+                backgroundColor: delivery ? "#3b82f6" : "transparent",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "0.2s",
+              }}
+            >
+              {delivery && (
+                <span
+                  style={{
+                    color: "#0b1220",
+                    fontWeight: 700,
+                    fontSize: 14,
+                  }}
+                >
+                  ✓
+                </span>
+              )}
+            </div>
+
             <span style={{ color: "#e5e7eb" }}>
               Request delivery{" "}
-              <span
-                style={{ color: "#93c5fd", fontWeight: 600 }}
-              >
+              <span style={{ color: "#93c5fd", fontWeight: 600 }}>
                 $2.50/mile traveled
               </span>{" "}
               <span style={{ color: "#94a3b8" }}>
@@ -494,58 +535,85 @@ export default function BookPage() {
             />
           </label>
 
-          {/* Towing vehicle insured checkbox (custom styled) */}
-<label
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    cursor: "pointer",
-    userSelect: "none",
-  }}
->
-  {/* Visually hidden real checkbox for accessibility */}
-  <input
-    type="checkbox"
-    checked={towingInsured}
-    onChange={(e) => setTowingInsured(e.target.checked)}
-    style={{
-      position: "absolute",
-      opacity: 0,
-      pointerEvents: "none",
-      width: 0,
-      height: 0,
-    }}
-  />
+          {/* Towing vehicle insured checkbox (centered, custom styled) */}
+          <div
+            style={{
+              gridColumn: "1 / span 2",
+              display: "flex",
+              justifyContent: "center",
+              marginTop: -10,
+            }}
+          >
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                userSelect: "none",
+                padding: "8px 14px",
+                background: "#0f172a",
+                border: "1px solid #1e293b",
+                borderRadius: 10,
+              }}
+            >
+              {/* Hidden real checkbox */}
+              <input
+                type="checkbox"
+                checked={towingInsured}
+                onChange={(e) => setTowingInsured(e.target.checked)}
+                style={{
+                  position: "absolute",
+                  opacity: 0,
+                  pointerEvents: "none",
+                  width: 0,
+                  height: 0,
+                }}
+              />
 
-  {/* Custom checkbox UI */}
-  <div
-    style={{
-      width: 18,
-      height: 18,
-      borderRadius: 4,
-      border: "1px solid #64748b",
-      backgroundColor: towingInsured ? "#22c55e" : "transparent",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      boxShadow: towingInsured ? "0 0 0 2px rgba(34,197,94,0.35)" : "none",
-      transition: "background-color 0.15s, box-shadow 0.15s",
-      fontSize: 13,
-      color: "#0b1220",
-      fontWeight: 700,
-    }}
-  >
-    {towingInsured ? "✓" : null}
-  </div>
+              {/* Stylized checkbox */}
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 6,
+                  border: "2px solid #64748b",
+                  backgroundColor: towingInsured ? "#22c55e" : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "0.2s",
+                }}
+              >
+                {towingInsured && (
+                  <span
+                    style={{
+                      color: "#0b1220",
+                      fontWeight: 700,
+                      fontSize: 14,
+                    }}
+                  >
+                    ✓
+                  </span>
+                )}
+              </div>
 
-  <span style={{ color: "#e5e7eb" }}>Towing vehicle is fully insured</span>
-</label>
-{errors.towingInsured && (
-  <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>
-    {errors.towingInsured}
-  </div>
-)}
+              <span style={{ color: "#e5e7eb", fontSize: 15 }}>
+                Towing vehicle is fully insured
+              </span>
+            </label>
+          </div>
+          {errors.towingInsured && (
+            <div
+              style={{
+                gridColumn: "1 / span 2",
+                color: "#fca5a5",
+                textAlign: "center",
+              }}
+            >
+              {errors.towingInsured}
+            </div>
+          )}
 
           {/* Cargo Hauled */}
           <div style={{ gridColumn: "1 / span 2", display: "grid", gap: 10 }}>
@@ -554,123 +622,115 @@ export default function BookPage() {
             </span>
 
             {/* Radio buttons (custom styled) */}
-<div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-  {/* Vehicle */}
-  <label
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      cursor: "pointer",
-      userSelect: "none",
-    }}
-  >
-    {/* Hidden real radio */}
-    <input
-      type="radio"
-      name="cargoType"
-      value="vehicle"
-      checked={cargoType === "vehicle"}
-      onChange={() => setCargoType("vehicle")}
-      style={{
-        position: "absolute",
-        opacity: 0,
-        pointerEvents: "none",
-        width: 0,
-        height: 0,
-      }}
-    />
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {/* Vehicle */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="cargoType"
+                  value="vehicle"
+                  checked={cargoType === "vehicle"}
+                  onChange={() => setCargoType("vehicle")}
+                  style={{
+                    position: "absolute",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    width: 0,
+                    height: 0,
+                  }}
+                />
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    border: "2px solid #64748b",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow:
+                      cargoType === "vehicle"
+                        ? "0 0 0 2px rgba(59,130,246,0.35)"
+                        : "none",
+                    transition: "box-shadow 0.15s, border-color 0.15s",
+                  }}
+                >
+                  {cargoType === "vehicle" && (
+                    <div
+                      style={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: "50%",
+                        backgroundColor: "#3b82f6",
+                      }}
+                    />
+                  )}
+                </div>
+                <span style={{ color: "#e5e7eb" }}>Vehicle</span>
+              </label>
 
-    {/* Custom circle */}
-    <div
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: "50%",
-        border: "2px solid #64748b",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow:
-          cargoType === "vehicle"
-            ? "0 0 0 2px rgba(59,130,246,0.35)"
-            : "none",
-        transition: "box-shadow 0.15s, border-color 0.15s",
-      }}
-    >
-      {cargoType === "vehicle" && (
-        <div
-          style={{
-            width: 9,
-            height: 9,
-            borderRadius: "50%",
-            backgroundColor: "#3b82f6",
-          }}
-        />
-      )}
-    </div>
-
-    <span style={{ color: "#e5e7eb" }}>Vehicle</span>
-  </label>
-
-  {/* Load */}
-  <label
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      cursor: "pointer",
-      userSelect: "none",
-    }}
-  >
-    {/* Hidden real radio */}
-    <input
-      type="radio"
-      name="cargoType"
-      value="load"
-      checked={cargoType === "load"}
-      onChange={() => setCargoType("load")}
-      style={{
-        position: "absolute",
-        opacity: 0,
-        pointerEvents: "none",
-        width: 0,
-        height: 0,
-      }}
-    />
-
-    {/* Custom circle */}
-    <div
-      style={{
-        width: 18,
-        height: 18,
-        borderRadius: "50%",
-        border: "2px solid #64748b",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow:
-          cargoType === "load"
-            ? "0 0 0 2px rgba(59,130,246,0.35)"
-            : "none",
-        transition: "box-shadow 0.15s, border-color 0.15s",
-      }}
-    >
-      {cargoType === "load" && (
-        <div
-          style={{
-            width: 9,
-            height: 9,
-            borderRadius: "50%",
-            backgroundColor: "#3b82f6",
-          }}
-        />
-      )}
-    </div>
-
-    <span style={{ color: "#e5e7eb" }}>Load</span>
-  </label>
-</div>
+              {/* Load */}
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="cargoType"
+                  value="load"
+                  checked={cargoType === "load"}
+                  onChange={() => setCargoType("load")}
+                  style={{
+                    position: "absolute",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    width: 0,
+                    height: 0,
+                  }}
+                />
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    border: "2px solid #64748b",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow:
+                      cargoType === "load"
+                        ? "0 0 0 2px rgba(59,130,246,0.35)"
+                        : "none",
+                    transition: "box-shadow 0.15s, border-color 0.15s",
+                  }}
+                >
+                  {cargoType === "load" && (
+                    <div
+                      style={{
+                        width: 9,
+                        height: 9,
+                        borderRadius: "50%",
+                        backgroundColor: "#3b82f6",
+                      }}
+                    />
+                  )}
+                </div>
+                <span style={{ color: "#e5e7eb" }}>Load</span>
+              </label>
+            </div>
 
             {errors.cargoType && (
               <small style={{ color: "#fca5a5" }}>{errors.cargoType}</small>
