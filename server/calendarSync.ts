@@ -32,6 +32,41 @@ type CalendarBookingInput = {
   delivery?: boolean;
 };
 
+/**
+ * Type guard to check if an error is a GaxiosError (Google API HTTP error)
+ */
+function isGaxiosError(e: unknown): e is GaxiosError {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "response" in e &&
+    typeof (e as GaxiosError).message === "string"
+  );
+}
+
+/**
+ * Extract and log detailed error information from API errors
+ */
+function logCalendarError(context: string, e: unknown): void {
+  if (isGaxiosError(e)) {
+    const errorDetails = {
+      message: e.message,
+      code: e.code,
+      status: e.response?.status,
+      statusText: e.response?.statusText,
+      data: e.response?.data,
+      errors: (e.response?.data as Record<string, unknown>)?.error,
+    };
+    console.error(`[CalendarSync] ${context} - Full details:`, errorDetails);
+    console.error(`[CalendarSync] ${context} - Stack:`, e.stack);
+  } else if (e instanceof Error) {
+    console.error(`[CalendarSync] ${context} - Error:`, e.message);
+    console.error(`[CalendarSync] ${context} - Stack:`, e.stack);
+  } else {
+    console.error(`[CalendarSync] ${context} - Unknown error:`, e);
+  }
+}
+
 function getCalendarClient(): calendar_v3.Calendar {
   if (!SERVICE_ACCOUNT_EMAIL || !SERVICE_ACCOUNT_KEY) {
     throw new Error("Google service account env vars not configured.");
@@ -40,11 +75,15 @@ function getCalendarClient(): calendar_v3.Calendar {
   // Replace escaped newlines with actual newlines (common when storing PEM keys in env vars)
   const formattedKey = SERVICE_ACCOUNT_KEY.replace(/\\n/g, "\n");
 
+  // Validate key format without exposing sensitive data
+  const hasBeginMarker = formattedKey.includes("-----BEGIN");
+  const hasEndMarker = formattedKey.includes("-----END");
+
   console.log("[CalendarSync] Creating JWT auth with:", {
     email: SERVICE_ACCOUNT_EMAIL,
-    keyStartsWith: formattedKey.substring(0, 30),
-    keyEndsWith: formattedKey.substring(formattedKey.length - 30),
     keyLength: formattedKey.length,
+    keyHasBeginMarker: hasBeginMarker,
+    keyHasEndMarker: hasEndMarker,
   });
 
   const jwt = new google.auth.JWT({
@@ -127,20 +166,7 @@ export async function createCalendarEvent(
 
     return resp.data.id ?? null;
   } catch (e) {
-    // Extract detailed error information from Google API errors
-    const gaxiosError = e as GaxiosError;
-    const errorDetails = {
-      message: gaxiosError.message,
-      code: gaxiosError.code,
-      status: gaxiosError.response?.status,
-      statusText: gaxiosError.response?.statusText,
-      data: gaxiosError.response?.data,
-      errors: (gaxiosError.response?.data as Record<string, unknown>)?.error,
-    };
-
-    console.error("[CalendarSync] CALENDAR_CREATE_ERROR - Full details:", errorDetails);
-    console.error("[CalendarSync] CALENDAR_CREATE_ERROR - Stack:", gaxiosError.stack);
-
+    logCalendarError("CALENDAR_CREATE_ERROR", e);
     return null;
   }
 }
@@ -183,17 +209,7 @@ export async function updateCalendarEvent(args: {
 
     console.log("[CalendarSync] Event updated successfully:", { eventId });
   } catch (e) {
-    const gaxiosError = e as GaxiosError;
-    const errorDetails = {
-      message: gaxiosError.message,
-      code: gaxiosError.code,
-      status: gaxiosError.response?.status,
-      statusText: gaxiosError.response?.statusText,
-      data: gaxiosError.response?.data,
-    };
-
-    console.error("[CalendarSync] CALENDAR_UPDATE_ERROR - Full details:", errorDetails);
-    console.error("[CalendarSync] CALENDAR_UPDATE_ERROR - Stack:", gaxiosError.stack);
+    logCalendarError("CALENDAR_UPDATE_ERROR", e);
   }
 }
 
@@ -214,16 +230,6 @@ export async function deleteCalendarEvent(eventId: string): Promise<void> {
 
     console.log("[CalendarSync] Event deleted successfully:", { eventId });
   } catch (e) {
-    const gaxiosError = e as GaxiosError;
-    const errorDetails = {
-      message: gaxiosError.message,
-      code: gaxiosError.code,
-      status: gaxiosError.response?.status,
-      statusText: gaxiosError.response?.statusText,
-      data: gaxiosError.response?.data,
-    };
-
-    console.error("[CalendarSync] CALENDAR_DELETE_ERROR - Full details:", errorDetails);
-    console.error("[CalendarSync] CALENDAR_DELETE_ERROR - Stack:", gaxiosError.stack);
+    logCalendarError("CALENDAR_DELETE_ERROR", e);
   }
 }
