@@ -14,6 +14,11 @@ type Row = {
   trailer_id?: string | null;
   trailers?: { name?: string | null } | null;
   clients?: { first_name?: string | null; last_name?: string | null; email?: string | null } | null;
+
+  // NEW – same extra fields returned from /api/admin/bookings
+  towing_insured?: boolean | null;
+  cargo_type?: "vehicle" | "load" | null;
+  cargo_description?: string | null;
 };
 
 type AvailOK = {
@@ -63,8 +68,14 @@ export default function BookingDetails() {
   const [conflicts, setConflicts] = useState<AvailOK["conflicts"]>([]);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const requiredSpan = useMemo(() => (row ? days(toInputDate(row.start_date), toInputDate(row.end_date)) : null), [row]);
-  const currentSpan = useMemo(() => (start && end ? days(start, end) : null), [start, end]);
+  const requiredSpan = useMemo(
+    () => (row ? days(toInputDate(row.start_date), toInputDate(row.end_date)) : null),
+    [row]
+  );
+  const currentSpan = useMemo(
+    () => (start && end ? days(start, end) : null),
+    [start, end]
+  );
   const spanMismatch = useMemo(() => {
     if (requiredSpan === null || currentSpan === null) return false;
     return currentSpan !== requiredSpan;
@@ -150,52 +161,66 @@ export default function BookingDetails() {
   }, [row]);
 
   async function applyReschedule() {
-  if (!row) return;
-  setSuccessMsg(null);
-  setErr(null);
+    if (!row) return;
+    setSuccessMsg(null);
+    setErr(null);
 
-  if (!start || !end) return setErr("Please select both start and end dates.");
-  if (new Date(start) > new Date(end)) return setErr("Start date must be <= end date.");
-  if (spanMismatch) return setErr(`Keep the same duration (${requiredSpan!} day${requiredSpan === 1 ? "" : "s"}).`);
-  if (available === false) return setErr("Selected dates conflict with existing bookings.");
+    if (!start || !end) return setErr("Please select both start and end dates.");
+    if (new Date(start) > new Date(end)) return setErr("Start date must be <= end date.");
+    if (spanMismatch) return setErr(`Keep the same duration (${requiredSpan!} day${requiredSpan === 1 ? "" : "s"}).`);
+    if (available === false) return setErr("Selected dates conflict with existing bookings.");
 
-  const ok = window.confirm(
-    `Reschedule ${row.rental_id} to:\n  ${start} → ${end}\n\nNotify the customer by email and return to Bookings?`
-  );
-  if (!ok) return;
+    const ok = window.confirm(
+      `Reschedule ${row.rental_id} to:\n  ${start} → ${end}\n\nNotify the customer by email and return to Bookings?`
+    );
+    if (!ok) return;
 
-  setSending(true);
-  try {
-    const resp = await fetch(`/api/admin/bookings/${row.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        reschedule_start: start,
-        reschedule_end: end,
-        send_reschedule_email: true,
-      }),
-    });
-    const json = await resp.json();
-    if (!resp.ok || !json?.ok) return setErr(json?.error || "Failed to reschedule.");
+    setSending(true);
+    try {
+      const resp = await fetch(`/api/admin/bookings/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reschedule_start: start,
+          reschedule_end: end,
+          send_reschedule_email: true,
+        }),
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json?.ok) return setErr(json?.error || "Failed to reschedule.");
 
-    // Optional flash + redirect
-    setSuccessMsg("Rescheduled and customer notified.");
-    // ensure navigation even if the fetch for /admin kicks off quickly
-    setTimeout(() => { window.location.href = "/admin"; }, 150);
-  } catch (e: any) {
-    setErr(e?.message || "Network error.");
-  } finally {
-    setSending(false);
+      // Optional flash + redirect
+      setSuccessMsg("Rescheduled and customer notified.");
+      setTimeout(() => { window.location.href = "/admin"; }, 150);
+    } catch (e: any) {
+      setErr(e?.message || "Network error.");
+    } finally {
+      setSending(false);
+    }
   }
-}
 
+  const cargoLabel =
+    row?.cargo_type === "vehicle"
+      ? "Vehicle"
+      : row?.cargo_type === "load"
+      ? "Load"
+      : null;
 
   return (
     <AdminLayout>
       <Head><title>Admin • Booking</title></Head>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-        <Link href="/admin" style={{ border: "1px solid #333", borderRadius: 8, padding: "6px 10px", textDecoration: "none", color: "#eaeaea" }}>
+        <Link
+          href="/admin"
+          style={{
+            border: "1px solid #333",
+            borderRadius: 8,
+            padding: "6px 10px",
+            textDecoration: "none",
+            color: "#eaeaea",
+          }}
+        >
           ← Back
         </Link>
         <h1 style={{ margin: 0, fontSize: 20 }}>Booking</h1>
@@ -207,8 +232,9 @@ export default function BookingDetails() {
 
       {row && (
         <div style={{ display: "grid", gap: 16 }}>
+          {/* Main info card */}
           <div style={card}>
-            <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
               <div><strong>Rental ID:</strong> {row.rental_id}</div>
               <div><strong>Status:</strong> {row.status}</div>
               <div>
@@ -216,11 +242,54 @@ export default function BookingDetails() {
                 <span style={{ color: "#9ca3af" }}>({row.clients?.email || "—"})</span>
               </div>
               <div><strong>Trailer:</strong> {row.trailers?.name || "—"}</div>
-              <div><strong>Current dates:</strong> {toInputDate(row.start_date)} → {toInputDate(row.end_date)}</div>
+              <div>
+                <strong>Current dates:</strong> {toInputDate(row.start_date)} → {toInputDate(row.end_date)}
+              </div>
             </div>
+
+            {/* NEW – Cargo & Towing section */}
+            {(cargoLabel || row.cargo_description || typeof row.towing_insured === "boolean") && (
+              <div
+                style={{
+                  marginTop: 6,
+                  paddingTop: 8,
+                  borderTop: "1px solid #1f2937",
+                  display: "grid",
+                  gap: 4,
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#e5e7eb",
+                  }}
+                >
+                  Cargo & Towing
+                </h3>
+
+                <p style={{ color: "#cbd5e1", fontSize: 13, margin: 0 }}>
+                  <strong style={{ color: "#e5e7eb" }}>Cargo type:</strong>{" "}
+                  {cargoLabel || "Not specified"}
+                </p>
+
+                <p style={{ color: "#cbd5e1", fontSize: 13, margin: 0 }}>
+                  <strong style={{ color: "#e5e7eb" }}>Details:</strong>{" "}
+                  {row.cargo_description || "No description provided."}
+                </p>
+
+                {typeof row.towing_insured === "boolean" && (
+                  <p style={{ color: "#cbd5e1", fontSize: 13, margin: 0 }}>
+                    <strong style={{ color: "#e5e7eb" }}>Towing insured:</strong>{" "}
+                    {row.towing_insured ? "Yes" : "No"}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Reschedule */}
+          {/* Reschedule card */}
           <div style={card}>
             <h3 style={{ marginTop: 0, marginBottom: 10 }}>Reschedule</h3>
             <p style={{ marginTop: 0, color: "#9ca3af" }}>
@@ -230,12 +299,22 @@ export default function BookingDetails() {
             <div style={{ display: "grid", gap: 10, maxWidth: 440 }}>
               <label style={rowStyle}>
                 <span style={{ width: 110, color: "#cbd5e1" }}>Start date</span>
-                <input type="date" value={start} onChange={(e) => setStart(e.target.value)} style={input} />
+                <input
+                  type="date"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  style={input}
+                />
               </label>
 
               <label style={rowStyle}>
                 <span style={{ width: 110, color: "#cbd5e1" }}>End date</span>
-                <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} style={input} />
+                <input
+                  type="date"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                  style={input}
+                />
               </label>
             </div>
 
