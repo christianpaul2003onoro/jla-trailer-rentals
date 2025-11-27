@@ -104,8 +104,9 @@ export default async function handler(
     [clientRec?.first_name, clientRec?.last_name].filter(Boolean).join(" ") ||
     "Client";
 
-  // 2) Google Calendar: create event (best effort)
+  // 2) Google Calendar: create event (best effort, but surface errors)
   let calendarEventId: string | null = null;
+  let calendarError: string | null = null;
   try {
     calendarEventId = await createCalendarEvent({
       rentalId: booking.rental_id as string,
@@ -115,8 +116,10 @@ export default async function handler(
       endDate: booking.end_date as string,
       delivery: !!booking.delivery_requested,
     });
-  } catch (e) {
-    console.error("CALENDAR_CREATE_ON_APPROVE_ERROR", e);
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("[Approve] CALENDAR_CREATE_ON_APPROVE_ERROR:", errorMessage);
+    calendarError = errorMessage;
   }
 
   // 3) Update → Approved + link + timestamps (+ calendar_event_id if we got one)
@@ -179,14 +182,22 @@ export default async function handler(
       subject,
       html,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const emailErrorMessage = e instanceof Error ? e.message : "Failed to send email";
     // Still return success with emailSent=false so UI can show a toast
     return ok(res, {
       row: updated,
       emailSent: false,
-      emailError: e?.message || "Failed to send email",
+      emailError: emailErrorMessage,
+      calendarEventId,
+      calendarError,
     });
   }
 
-  return ok(res, { row: updated, emailSent: true });
+  return ok(res, { 
+    row: updated, 
+    emailSent: true,
+    calendarEventId,
+    calendarError,
+  });
 }
