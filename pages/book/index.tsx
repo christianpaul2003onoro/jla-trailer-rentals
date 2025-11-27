@@ -36,7 +36,7 @@ export default function BookPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [pickupTime, setPickupTime] = useState("");
-  const [returnTime, setReturnTime] = useState("");
+  const [returnTime, setReturnTime] = useState(""); // will mirror pickupTime
   const [delivery, setDelivery] = useState(false);
 
   const [firstName, setFirstName] = useState("");
@@ -45,6 +45,11 @@ export default function BookPage() {
   const [phone, setPhone] = useState("");
   const [vehicle, setVehicle] = useState("");
   const [comments, setComments] = useState("");
+
+  // NEW: cargo + towing insurance
+  const [cargoType, setCargoType] = useState<"vehicle" | "load" | "">("");
+  const [cargoDescription, setCargoDescription] = useState("");
+  const [towingInsured, setTowingInsured] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -73,12 +78,20 @@ export default function BookPage() {
     if (q) setTrailerId(q);
   }, [router.isReady, router.query]);
 
+  // ---------- keep returnTime equal to pickupTime ----------
+  useEffect(() => {
+    setReturnTime(pickupTime || "");
+  }, [pickupTime]);
+
   // ---------- derived pricing ----------
   const selected = useMemo(
     () => trailers.find((t) => t.id === trailerId),
     [trailers, trailerId]
   );
-  const dayCount = useMemo(() => daysBetween(startDate, endDate), [startDate, endDate]);
+  const dayCount = useMemo(
+    () => daysBetween(startDate, endDate),
+    [startDate, endDate]
+  );
   const base = useMemo(
     () => (selected ? selected.rate_per_day * dayCount : 0),
     [selected, dayCount]
@@ -144,16 +157,25 @@ export default function BookPage() {
     if (!email.trim()) e.email = "Enter your email.";
     if (!phone.trim()) e.phone = "Enter your phone.";
 
+    // NEW: cargo + towing insurance validation
+    if (!cargoType) e.cargoType = "Please select what you will be hauling.";
+    if (!cargoDescription.trim())
+      e.cargoDescription = "Please describe the vehicle or load you will haul.";
+    if (!towingInsured)
+      e.towingInsured =
+        "You must confirm that the towing vehicle is fully insured.";
+
     if (isAvailable === false)
-      e.dates = "Those dates are not available for this trailer. Please choose a different range.";
+      e.dates =
+        "Those dates are not available for this trailer. Please choose a different range.";
 
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
   // ---------- submit ----------
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
     setFormError(null);
     if (!validate()) return;
 
@@ -162,7 +184,7 @@ export default function BookPage() {
       start_date: startDate,
       end_date: endDate,
       pickup_time: pickupTime || null,
-      return_time: returnTime || null,
+      return_time: returnTime || pickupTime || null, // always mirrors pickup
       delivery_requested: delivery,
       first_name: firstName,
       last_name: lastName,
@@ -170,6 +192,11 @@ export default function BookPage() {
       phone,
       towing_vehicle: vehicle,
       comments,
+
+      // NEW fields (backend can start consuming these later)
+      cargo_type: cargoType || null,
+      cargo_description: cargoDescription.trim() || null,
+      towing_insured: towingInsured,
     };
 
     try {
@@ -181,7 +208,8 @@ export default function BookPage() {
       const json = await resp.json();
 
       if (!resp.ok || !json.ok) {
-        if (json?.field) setErrors((p) => ({ ...p, [json.field]: json.error }));
+        if (json?.field)
+          setErrors((p) => ({ ...p, [json.field]: json.error }));
         else setFormError(json?.error || "Could not create booking.");
         return;
       }
@@ -227,50 +255,105 @@ export default function BookPage() {
   // ---------- UI ----------
   return (
     <>
-      <Head><title>Book a Trailer • JLA Trailer Rentals</title></Head>
+      <Head>
+        <title>Book a Trailer • JLA Trailer Rentals</title>
+      </Head>
       <Nav />
 
-      <main style={{ maxWidth: 1100, margin: "32px auto", padding: "0 16px" }}>
-        <h1 style={{ fontSize: 36, fontWeight: 800, marginBottom: 8, color: "#e5e7eb" }}>
+      <main
+        style={{ maxWidth: 1100, margin: "32px auto", padding: "0 16px" }}
+      >
+        <h1
+          style={{
+            fontSize: 36,
+            fontWeight: 800,
+            marginBottom: 8,
+            color: "#e5e7eb",
+          }}
+        >
           Book a Trailer
         </h1>
         <p style={{ color: "#cbd5e1", marginBottom: 22 }}>
-          Choose a trailer, pick your dates, and fill your info. We’ll confirm by email.
-          Delivery available — <strong>$2.50/mile traveled</strong> (estimate provided after billing).
+          Choose a trailer, pick your dates, and fill your info. We’ll confirm
+          by email. Delivery available —{" "}
+          <strong>$2.50/mile traveled</strong> (estimate provided after
+          billing).
         </p>
 
-        <form onSubmit={onSubmit} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+        <form
+          onSubmit={onSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 18,
+          }}
+        >
           {/* Trailer */}
           <label style={{ display: "grid", gap: 8 }}>
             <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Trailer</span>
-            <select value={trailerId} onChange={(e) => setTrailerId(e.target.value)} style={inputStyle}>
+            <select
+              value={trailerId}
+              onChange={(e) => setTrailerId(e.target.value)}
+              style={inputStyle}
+            >
               <option value="">Select a trailer...</option>
               {trailers.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
               ))}
             </select>
-            {errors.trailerId && <small style={{ color: "#fca5a5" }}>{errors.trailerId}</small>}
+            {errors.trailerId && (
+              <small style={{ color: "#fca5a5" }}>{errors.trailerId}</small>
+            )}
           </label>
 
           {/* Dates */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+          >
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Start Date</span>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={inputStyle} min={todayStr} />
-              {errors.startDate && <small style={{ color: "#fca5a5" }}>{errors.startDate}</small>}
+              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+                Start Date
+              </span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                style={inputStyle}
+                min={todayStr}
+              />
+              {errors.startDate && (
+                <small style={{ color: "#fca5a5" }}>{errors.startDate}</small>
+              )}
             </label>
             <label style={{ display: "grid", gap: 8 }}>
               <span style={{ color: "#e5e7eb", fontWeight: 600 }}>End Date</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={inputStyle} min={startDate || todayStr} />
-              {errors.endDate && <small style={{ color: "#fca5a5" }}>{errors.endDate}</small>}
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                style={inputStyle}
+                min={startDate || todayStr}
+              />
+              {errors.endDate && (
+                <small style={{ color: "#fca5a5" }}>{errors.endDate}</small>
+              )}
             </label>
 
             {/* Availability banner */}
             <div style={{ gridColumn: "1 / span 2" }}>
-              {checkingAvail && <div style={{ color: "#93c5fd" }}>Checking availability…</div>}
-              {!checkingAvail && isAvailable === true && startDate && endDate && (
-                <div style={{ color: "#86efac" }}>✅ Those dates are available.</div>
+              {checkingAvail && (
+                <div style={{ color: "#93c5fd" }}>Checking availability…</div>
               )}
+              {!checkingAvail &&
+                isAvailable === true &&
+                startDate &&
+                endDate && (
+                  <div style={{ color: "#86efac" }}>
+                    ✅ Those dates are available.
+                  </div>
+                )}
               {!checkingAvail && isAvailable === false && (
                 <div
                   style={{
@@ -281,7 +364,9 @@ export default function BookPage() {
                     padding: "8px 10px",
                   }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  <div
+                    style={{ fontWeight: 700, marginBottom: 4 }}
+                  >
                     Those dates are not available for this trailer.
                   </div>
                   {conflicts.length > 0 && (
@@ -298,60 +383,206 @@ export default function BookPage() {
             </div>
           </div>
 
-          {/* Times */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {/* Time (single picker for pickup/return) */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
             <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Pickup Time</span>
-              <input type="time" value={pickupTime} onChange={(e) => setPickupTime(e.target.value)} style={inputStyle} />
-            </label>
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Return Time</span>
-              <input type="time" value={returnTime} onChange={(e) => setReturnTime(e.target.value)} style={inputStyle} />
+              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+                Pickup / Return Time
+              </span>
+              <input
+                type="time"
+                value={pickupTime}
+                onChange={(e) => setPickupTime(e.target.value)}
+                style={inputStyle}
+              />
+              <small style={{ color: "#94a3b8" }}>
+                Rentals are in 24-hour periods. Your return time will match your
+                pickup time.
+              </small>
             </label>
           </div>
 
           {/* Delivery */}
-          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="checkbox" checked={delivery} onChange={(e) => setDelivery(e.target.checked)} />
+          <label
+            style={{ display: "flex", alignItems: "center", gap: 10 }}
+          >
+            <input
+              type="checkbox"
+              checked={delivery}
+              onChange={(e) => setDelivery(e.target.checked)}
+            />
             <span style={{ color: "#e5e7eb" }}>
-              Request delivery <span style={{ color: "#93c5fd", fontWeight: 600 }}>$2.50/mile traveled</span>{" "}
-              <span style={{ color: "#94a3b8" }}>(estimate provided after billing)</span>
+              Request delivery{" "}
+              <span
+                style={{ color: "#93c5fd", fontWeight: 600 }}
+              >
+                $2.50/mile traveled
+              </span>{" "}
+              <span style={{ color: "#94a3b8" }}>
+                (estimate provided after billing)
+              </span>
             </span>
           </label>
 
           {/* Names */}
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>First Name</span>
-            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Your first name" style={inputStyle} />
-            {errors.firstName && <small style={{ color: "#fca5a5" }}>{errors.firstName}</small>}
+            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+              First Name
+            </span>
+            <input
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              placeholder="Your first name"
+              style={inputStyle}
+            />
+            {errors.firstName && (
+              <small style={{ color: "#fca5a5" }}>{errors.firstName}</small>
+            )}
           </label>
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Last Name</span>
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Your last name" style={inputStyle} />
-            {errors.lastName && <small style={{ color: "#fca5a5" }}>{errors.lastName}</small>}
+            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+              Last Name
+            </span>
+            <input
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              placeholder="Your last name"
+              style={inputStyle}
+            />
+            {errors.lastName && (
+              <small style={{ color: "#fca5a5" }}>{errors.lastName}</small>
+            )}
           </label>
 
           {/* Contact */}
           <label style={{ display: "grid", gap: 8 }}>
             <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Phone</span>
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(786) 760-6175" style={inputStyle} />
-            {errors.phone && <small style={{ color: "#fca5a5" }}>{errors.phone}</small>}
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(786) 760-6175"
+              style={inputStyle}
+            />
+            {errors.phone && (
+              <small style={{ color: "#fca5a5" }}>{errors.phone}</small>
+            )}
           </label>
           <label style={{ display: "grid", gap: 8 }}>
             <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Email</span>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" style={inputStyle} />
-            {errors.email && <small style={{ color: "#fca5a5" }}>{errors.email}</small>}
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={inputStyle}
+            />
+            {errors.email && (
+              <small style={{ color: "#fca5a5" }}>{errors.email}</small>
+            )}
           </label>
 
-          {/* Vehicle */}
+          {/* Towing vehicle */}
           <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Towing Vehicle</span>
-            <input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="e.g., Ford F-150" style={inputStyle} />
+            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+              Towing Vehicle
+            </span>
+            <input
+              value={vehicle}
+              onChange={(e) => setVehicle(e.target.value)}
+              placeholder="e.g., Ford F-150"
+              style={inputStyle}
+            />
           </label>
 
-          {/* Notes */}
-          <label style={{ gridColumn: "1 / span 1", display: "grid", gap: 8 }}>
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>Additional Comments</span>
+          {/* Towing vehicle insured checkbox */}
+          <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input
+              type="checkbox"
+              checked={towingInsured}
+              onChange={(e) => setTowingInsured(e.target.checked)}
+            />
+            <span style={{ color: "#e5e7eb" }}>
+              I confirm the towing vehicle is fully insured.
+            </span>
+          </label>
+          {errors.towingInsured && (
+            <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>
+              {errors.towingInsured}
+            </div>
+          )}
+
+          {/* Cargo Hauled */}
+          <div style={{ gridColumn: "1 / span 2", display: "grid", gap: 10 }}>
+            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+              Cargo Hauled
+            </span>
+
+            {/* Radio buttons */}
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <label
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <input
+                  type="radio"
+                  name="cargoType"
+                  value="vehicle"
+                  checked={cargoType === "vehicle"}
+                  onChange={() => setCargoType("vehicle")}
+                />
+                <span style={{ color: "#e5e7eb" }}>Vehicle</span>
+              </label>
+              <label
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
+              >
+                <input
+                  type="radio"
+                  name="cargoType"
+                  value="load"
+                  checked={cargoType === "load"}
+                  onChange={() => setCargoType("load")}
+                />
+                <span style={{ color: "#e5e7eb" }}>Load</span>
+              </label>
+            </div>
+            {errors.cargoType && (
+              <small style={{ color: "#fca5a5" }}>{errors.cargoType}</small>
+            )}
+
+            {/* Description based on selection */}
+            {cargoType && (
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+                  {cargoType === "vehicle"
+                    ? "Vehicle details"
+                    : "Load details"}
+                </span>
+                <textarea
+                  value={cargoDescription}
+                  onChange={(e) => setCargoDescription(e.target.value)}
+                  placeholder={
+                    cargoType === "vehicle"
+                      ? "e.g., 2022 Tesla Model 3, sedan"
+                      : "e.g., 6 pallets of tile, approx 5,000 lb"
+                  }
+                  rows={3}
+                  style={{ ...inputStyle, resize: "vertical" }}
+                />
+                {errors.cargoDescription && (
+                  <small style={{ color: "#fca5a5" }}>
+                    {errors.cargoDescription}
+                  </small>
+                )}
+              </label>
+            )}
+          </div>
+
+          {/* Additional Comments */}
+          <label
+            style={{ gridColumn: "1 / span 1", display: "grid", gap: 8 }}
+          >
+            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+              Additional Comments
+            </span>
             <textarea
               value={comments}
               onChange={(e) => setComments(e.target.value)}
@@ -371,20 +602,45 @@ export default function BookPage() {
               padding: 16,
             }}
           >
-            <div style={{ color: "#e5e7eb", fontWeight: 700, marginBottom: 8 }}>Quote preview</div>
-            <div style={{ color: "#cbd5e1" }}>Days: {dayCount}</div>
-            <div style={{ color: "#cbd5e1" }}>Daily rate: ${selected?.rate_per_day ?? 0}</div>
-            <div style={{ color: "#e5e7eb", fontWeight: 700 }}>Base: ${base.toFixed(2)}</div>
-            <div style={{ color: "#cbd5e1" }}>
-              Delivery (est.): <strong>$2.50/mile traveled</strong> — <em>TBD</em>
+            <div
+              style={{
+                color: "#e5e7eb",
+                fontWeight: 700,
+                marginBottom: 8,
+              }}
+            >
+              Quote preview
             </div>
-            <div style={{ color: "#e5e7eb", fontWeight: 800, marginTop: 6 }}>
+            <div style={{ color: "#cbd5e1" }}>Days: {dayCount}</div>
+            <div style={{ color: "#cbd5e1" }}>
+              Daily rate: ${selected?.rate_per_day ?? 0}
+            </div>
+            <div style={{ color: "#e5e7eb", fontWeight: 700 }}>
+              Base: ${base.toFixed(2)}
+            </div>
+            <div style={{ color: "#cbd5e1" }}>
+              Delivery (est.):{" "}
+              <strong>$2.50/mile traveled</strong> — <em>TBD</em>
+            </div>
+            <div
+              style={{
+                color: "#e5e7eb",
+                fontWeight: 800,
+                marginTop: 6,
+              }}
+            >
               Total est.: ${total.toFixed(2)}
             </div>
           </div>
 
           {/* Actions */}
-          <div style={{ display: "flex", gap: 10, gridColumn: "1 / span 2" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              gridColumn: "1 / span 2",
+            }}
+          >
             <button
               type="submit"
               disabled={checkingAvail || isAvailable === false}
@@ -395,25 +651,42 @@ export default function BookPage() {
                 borderRadius: 8,
                 color: "white",
                 fontWeight: 700,
-                opacity: checkingAvail || isAvailable === false ? 0.6 : 1,
-                cursor: checkingAvail || isAvailable === false ? "not-allowed" : "pointer",
+                opacity:
+                  checkingAvail || isAvailable === false ? 0.6 : 1,
+                cursor:
+                  checkingAvail || isAvailable === false
+                    ? "not-allowed"
+                    : "pointer",
               }}
             >
               {checkingAvail ? "Checking…" : "Confirm & Book"}
             </button>
             <Link
               href="/fleet"
-              style={{ border: "1px solid #334155", padding: "10px 14px", borderRadius: 8, color: "#e5e7eb" }}
+              style={{
+                border: "1px solid #334155",
+                padding: "10px 14px",
+                borderRadius: 8,
+                color: "#e5e7eb",
+              }}
             >
               Back to Fleet
             </Link>
           </div>
 
           {errors.dates && (
-            <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>{errors.dates}</div>
+            <div
+              style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}
+            >
+              {errors.dates}
+            </div>
           )}
           {formError && (
-            <div style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}>{formError}</div>
+            <div
+              style={{ gridColumn: "1 / span 2", color: "#fca5a5" }}
+            >
+              {formError}
+            </div>
           )}
         </form>
       </main>
