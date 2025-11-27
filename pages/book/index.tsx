@@ -512,82 +512,83 @@ export default function BookPage() {
             )}
           </label>
 
-          {/* Towing vehicle + insured checkbox on same row */}
           <div
-            style={{
-              gridColumn: "1 / span 2",
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) auto",
-              columnGap: 16,
-              alignItems: "end",
-            }}
-          >
-            {/* Towing vehicle input */}
-            <label style={{ display: "grid", gap: 8 }}>
-              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-                Towing Vehicle
-              </span>
-              <input
-                value={vehicle}
-                onChange={(e) => setVehicle(e.target.value)}
-                placeholder="e.g., Ford F-150"
-                style={inputStyle}
-              />
-            </label>
+  style={{
+    gridColumn: "1 / span 2",
+    display: "grid",
+    gridTemplateColumns: "70% 30%",
+    columnGap: 16,
+    alignItems: "end",
+  }}
+>
+  {/* Towing vehicle input */}
+  <label style={{ display: "grid", gap: 8 }}>
+    <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+      Towing Vehicle
+    </span>
+    <input
+      value={vehicle}
+      onChange={(e) => setVehicle(e.target.value)}
+      placeholder="e.g., Ford F-150"
+      style={{ ...inputStyle }}
+    />
+  </label>
 
-            {/* Insured checkbox */}
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                cursor: "pointer",
-                userSelect: "none",
-                paddingBottom: 4,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={towingInsured}
-                onChange={(e) => setTowingInsured(e.target.checked)}
-                style={{
-                  position: "absolute",
-                  opacity: 0,
-                  pointerEvents: "none",
-                  width: 0,
-                  height: 0,
-                }}
-              />
-              <div
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 6,
-                  border: "2px solid #64748b",
-                  backgroundColor: towingInsured ? "#22c55e" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "0.2s",
-                }}
-              >
-                {towingInsured && (
-                  <span
-                    style={{
-                      color: "#0b1220",
-                      fontWeight: 700,
-                      fontSize: 14,
-                    }}
-                  >
-                    ✓
-                  </span>
-                )}
-              </div>
-              <span style={{ color: "#e5e7eb", fontSize: 15 }}>
-                Towing vehicle is fully insured
-              </span>
-            </label>
-          </div>
+  {/* Insured checkbox (blue) */}
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      cursor: "pointer",
+      userSelect: "none",
+      paddingBottom: 6,
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={towingInsured}
+      onChange={(e) => setTowingInsured(e.target.checked)}
+      style={{
+        position: "absolute",
+        opacity: 0,
+        pointerEvents: "none",
+        width: 0,
+        height: 0,
+      }}
+    />
+
+    <div
+      style={{
+        width: 20,
+        height: 20,
+        borderRadius: 6,
+        border: "2px solid #64748b",
+        backgroundColor: towingInsured ? "#3b82f6" : "transparent",  // BLUE
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "0.2s",
+      }}
+    >
+      {towingInsured && (
+        <span
+          style={{
+            color: "#0b1220",
+            fontWeight: 700,
+            fontSize: 14,
+          }}
+        >
+          ✓
+        </span>
+      )}
+    </div>
+
+    <span style={{ color: "#e5e7eb", fontSize: 15 }}>
+      Towing vehicle is fully insured
+    </span>
+  </label>
+</div>
           {errors.towingInsured && (
             <div
               style={{
