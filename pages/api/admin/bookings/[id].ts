@@ -136,13 +136,13 @@ export default async function handler(
                 .join(" ") || null;
             const trailerName = trailer?.name ?? null;
 
-            // 🔹 NEW: match updateCalendarEvent({ eventId, booking })
             await updateCalendarEvent({
               eventId,
               booking: {
                 rentalId: updated.rental_id as string,
                 trailerName,
-                customerName: clientName,
+                // 🔹 FIX HERE: force string, even if name is null
+                customerName: clientName ?? "",
                 startDate: updated.start_date as string,
                 endDate: updated.end_date as string,
               },
