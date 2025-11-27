@@ -23,6 +23,11 @@ type Row = {
     last_name?: string | null;
     email?: string | null;
   } | null;
+
+  // NEW – extra data we already save on booking
+  towing_insured?: boolean | null;
+  cargo_type?: "vehicle" | "load" | null;
+  cargo_description?: string | null;
 };
 
 function fmtLocal(dt?: string | null) {
@@ -283,36 +288,91 @@ export default function AdminHome() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} style={{ borderTop: "1px solid #222" }}>
-                  <td style={td}>
-                    <div style={{ fontWeight: 700 }}>{r.rental_id}</div>
-                    <div style={{ fontSize: 12, color: "#b8b8b8" }}>
-                      Created {fmtLocal(r.created_at)}
-                    </div>
-                  </td>
-                  <td style={td}>
-                    {(r.clients?.first_name || r.clients?.last_name)
-                      ? `${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()
-                      : "—"}
-                    <div style={{ fontSize: 12, color: "#b8b8b8" }}>{r.clients?.email ?? "—"}</div>
-                  </td>
-                  <td style={td}>{r.trailers?.name ?? "—"}</td>
-                  <td style={td}>{r.start_date} → {r.end_date}</td>
-                  <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
-                  <td style={td}>
-                    <div style={{ display: "grid", gap: 4 }}>
-                      <StatusPill status={r.status} />
-                      {r.status === "Paid" && r.paid_at && (
-                        <div style={{ fontSize: 12, color: "#22c55e" }}>
-                          Paid {fmtLocal(r.paid_at)}
+              {rows.map((r) => {
+                const cargoLabel =
+                  r.cargo_type === "vehicle"
+                    ? "Vehicle"
+                    : r.cargo_type === "load"
+                    ? "Load"
+                    : null;
+
+                return (
+                  <tr key={r.id} style={{ borderTop: "1px solid #222" }}>
+                    <td style={td}>
+                      <div style={{ fontWeight: 700 }}>{r.rental_id}</div>
+                      <div style={{ fontSize: 12, color: "#b8b8b8" }}>
+                        Created {fmtLocal(r.created_at)}
+                      </div>
+                    </td>
+                    <td style={td}>
+                      {(r.clients?.first_name || r.clients?.last_name)
+                        ? `${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()
+                        : "—"}
+                      <div style={{ fontSize: 12, color: "#b8b8b8" }}>
+                        {r.clients?.email ?? "—"}
+                      </div>
+
+                      {/* NEW: Cargo & towing info */}
+                      {(cargoLabel || r.cargo_description || typeof r.towing_insured === "boolean") && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: "#9ca3af" }}>
+                          {cargoLabel && (
+                            <div>
+                              <strong style={{ color: "#e5e7eb" }}>Cargo:</strong>{" "}
+                              {cargoLabel}
+                              {r.cargo_description ? ` — ${r.cargo_description}` : ""}
+                            </div>
+                          )}
+
+                          {typeof r.towing_insured === "boolean" && (
+                            <div style={{ marginTop: 3 }}>
+                              <strong style={{ color: "#e5e7eb" }}>Towing insured:</strong>{" "}
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  padding: "2px 8px",
+                                  borderRadius: 999,
+                                  fontSize: 11,
+                                  backgroundColor: r.towing_insured ? "#022c22" : "#3f1f1f",
+                                  color: r.towing_insured ? "#6ee7b7" : "#fecaca",
+                                  border: `1px solid ${
+                                    r.towing_insured ? "#22c55e" : "#ef4444"
+                                  }`,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: "50%",
+                                    backgroundColor: r.towing_insured ? "#22c55e" : "#ef4444",
+                                  }}
+                                />
+                                {r.towing_insured ? "Confirmed" : "Not confirmed"}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  </td>
-                  <td style={td}><Actions r={r} /></td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={td}>{r.trailers?.name ?? "—"}</td>
+                    <td style={td}>{r.start_date} → {r.end_date}</td>
+                    <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
+                    <td style={td}>
+                      <div style={{ display: "grid", gap: 4 }}>
+                        <StatusPill status={r.status} />
+                        {r.status === "Paid" && r.paid_at && (
+                          <div style={{ fontSize: 12, color: "#22c55e" }}>
+                            Paid {fmtLocal(r.paid_at)}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td style={td}><Actions r={r} /></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
