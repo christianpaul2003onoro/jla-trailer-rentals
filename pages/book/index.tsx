@@ -193,7 +193,7 @@ export default function BookPage() {
       towing_vehicle: vehicle,
       comments,
 
-      // NEW fields (backend can start consuming these later)
+      // NEW fields
       cargo_type: cargoType || null,
       cargo_description: cargoDescription.trim() || null,
       towing_insured: towingInsured,
@@ -214,7 +214,6 @@ export default function BookPage() {
         return;
       }
 
-      // Success → redirect with rental + key + name + email, and save for refresh
       const payloadForSuccess = {
         rental: json.rental_id,
         key: json.access_key,
@@ -398,7 +397,7 @@ export default function BookPage() {
             </label>
           </div>
 
-          {/* Delivery (custom styled checkbox) */}
+          {/* Delivery (custom checkbox, no big background) */}
           <label
             style={{
               display: "flex",
@@ -406,14 +405,8 @@ export default function BookPage() {
               gap: 10,
               cursor: "pointer",
               userSelect: "none",
-              padding: "8px 12px",
-              background: "#0f172a",
-              border: "1px solid #1e293b",
-              borderRadius: 10,
-              width: "fit-content",
             }}
           >
-            {/* Hidden real checkbox */}
             <input
               type="checkbox"
               checked={delivery}
@@ -426,8 +419,6 @@ export default function BookPage() {
                 height: 0,
               }}
             />
-
-            {/* Custom checkbox */}
             <div
               style={{
                 width: 20,
@@ -453,7 +444,6 @@ export default function BookPage() {
                 </span>
               )}
             </div>
-
             <span style={{ color: "#e5e7eb" }}>
               Request delivery{" "}
               <span style={{ color: "#93c5fd", fontWeight: 600 }}>
@@ -522,28 +512,30 @@ export default function BookPage() {
             )}
           </label>
 
-          {/* Towing vehicle */}
-          <label style={{ display: "grid", gap: 8 }}>
-            <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-              Towing Vehicle
-            </span>
-            <input
-              value={vehicle}
-              onChange={(e) => setVehicle(e.target.value)}
-              placeholder="e.g., Ford F-150"
-              style={inputStyle}
-            />
-          </label>
-
-          {/* Towing vehicle insured checkbox (centered, custom styled) */}
+          {/* Towing vehicle + insured checkbox on same row */}
           <div
             style={{
               gridColumn: "1 / span 2",
-              display: "flex",
-              justifyContent: "center",
-              marginTop: -10,
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              columnGap: 16,
+              alignItems: "end",
             }}
           >
+            {/* Towing vehicle input */}
+            <label style={{ display: "grid", gap: 8 }}>
+              <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
+                Towing Vehicle
+              </span>
+              <input
+                value={vehicle}
+                onChange={(e) => setVehicle(e.target.value)}
+                placeholder="e.g., Ford F-150"
+                style={inputStyle}
+              />
+            </label>
+
+            {/* Insured checkbox */}
             <label
               style={{
                 display: "flex",
@@ -551,13 +543,9 @@ export default function BookPage() {
                 gap: 10,
                 cursor: "pointer",
                 userSelect: "none",
-                padding: "8px 14px",
-                background: "#0f172a",
-                border: "1px solid #1e293b",
-                borderRadius: 10,
+                paddingBottom: 4,
               }}
             >
-              {/* Hidden real checkbox */}
               <input
                 type="checkbox"
                 checked={towingInsured}
@@ -570,8 +558,6 @@ export default function BookPage() {
                   height: 0,
                 }}
               />
-
-              {/* Stylized checkbox */}
               <div
                 style={{
                   width: 20,
@@ -597,7 +583,6 @@ export default function BookPage() {
                   </span>
                 )}
               </div>
-
               <span style={{ color: "#e5e7eb", fontSize: 15 }}>
                 Towing vehicle is fully insured
               </span>
@@ -608,7 +593,7 @@ export default function BookPage() {
               style={{
                 gridColumn: "1 / span 2",
                 color: "#fca5a5",
-                textAlign: "center",
+                textAlign: "left",
               }}
             >
               {errors.towingInsured}
@@ -740,9 +725,7 @@ export default function BookPage() {
             {cargoType && (
               <label style={{ display: "grid", gap: 8 }}>
                 <span style={{ color: "#e5e7eb", fontWeight: 600 }}>
-                  {cargoType === "vehicle"
-                    ? "Vehicle details"
-                    : "Load details"}
+                  {cargoType === "vehicle" ? "Vehicle details" : "Load details"}
                 </span>
                 <textarea
                   value={cargoDescription}
