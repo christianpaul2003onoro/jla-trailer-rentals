@@ -1,5 +1,6 @@
 // pages/admin/index.tsx
 import { useEffect, useMemo, useState } from "react";
+import type React from "react";
 import Head from "next/head";
 import AdminLayout from "../../components/AdminLayout";
 import StatusPill from "../../components/StatusPill";
@@ -43,11 +44,14 @@ export default function AdminHome() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // NEW: manual calendar sync busy state
+  const [syncing, setSyncing] = useState(false);
+
   // Close modal (no reschedule option here)
   const [closing, setClosing] = useState<null | Row>(null);
   const [outcome, setOutcome] = useState<"completed" | "cancelled">("completed");
   const [reason, setReason] = useState("");
-  const [sendThankYou, setSendThankYou] = useState(true);     // default ON
+  const [sendThankYou, setSendThankYou] = useState(true); // default ON
   const [sendCancelEmail, setSendCancelEmail] = useState(true); // default ON
 
   // Approve + payment link modal
@@ -85,6 +89,53 @@ export default function AdminHome() {
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, []);
+
+  // NEW: manual "Sync Calendar Now" handler
+  async function handleManualCalendarSync() {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const resp = await fetch("/api/admin/calendar/import-from-google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          daysBack: 2,
+          daysForward: 60,
+          source: "manual-click",
+        }),
+      });
+
+      const data = await resp.json().catch(() => ({} as any));
+
+      if (!resp.ok || data?.ok === false) {
+        console.error("Manual calendar sync failed:", data);
+        alert(data?.error || "Calendar sync failed. Check logs for details.");
+        return;
+      }
+
+      const created = data.created ?? 0;
+      const skipped = data.skippedExisting ?? 0;
+      const ignored = data.ignored ?? 0;
+
+      alert(
+        `Calendar sync completed:\n` +
+          `• New bookings created: ${created}\n` +
+          `• Existing bookings skipped: ${skipped}\n` +
+          `• Events ignored: ${ignored}`
+      );
+
+      // in case new bookings were created, refresh the table
+      if (created > 0) {
+        await refreshRows();
+      }
+    } catch (err: any) {
+      console.error("Manual calendar sync error:", err);
+      alert(err?.message || "Calendar sync failed (network or server error).");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function patchStatus(id: string, body: Record<string, any>) {
     const resp = await fetch(`/api/admin/bookings/${id}`, {
@@ -134,14 +185,14 @@ export default function AdminHome() {
     }
 
     const name =
-      (row.clients?.first_name || row.clients?.last_name)
+      row.clients?.first_name || row.clients?.last_name
         ? `${row.clients?.first_name ?? ""} ${row.clients?.last_name ?? ""}`.trim()
         : "customer";
     const email = row.clients?.email ?? "no-email";
 
     const ok = window.confirm(
       `Confirm marking ${row.rental_id} as Paid and sending a receipt to:\n\n` +
-      `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
+        `${name} <${email}>\n\nPress OK to proceed or Cancel to abort.`
     );
     if (!ok) return;
 
@@ -202,20 +253,24 @@ export default function AdminHome() {
 
     // Build a confirmation summary
     const who =
-      (closing.clients?.first_name || closing.clients?.last_name)
+      closing.clients?.first_name || closing.clients?.last_name
         ? `${closing.clients?.first_name ?? ""} ${closing.clients?.last_name ?? ""}`.trim()
         : "customer";
     const email = closing.clients?.email ?? "no-email";
 
     const emailNote =
       outcome === "completed"
-        ? (sendThankYou ? "A Thank-you email (with review link) WILL be sent." : "No email will be sent.")
-        : (sendCancelEmail ? "A Cancellation email WILL be sent." : "No email will be sent.");
+        ? sendThankYou
+          ? "A Thank-you email (with review link) WILL be sent."
+          : "No email will be sent."
+        : sendCancelEmail
+        ? "A Cancellation email WILL be sent."
+        : "No email will be sent.";
 
     const ok = window.confirm(
       `Close booking ${closing.rental_id} as ${outcome === "completed" ? "Finished" : "Cancelled"}?\n\n` +
-      `Customer: ${who} <${email}>\n` +
-      `${emailNote}\n\nPress OK to confirm or Cancel to abort.`
+        `Customer: ${who} <${email}>\n` +
+        `${emailNote}\n\nPress OK to confirm or Cancel to abort.`
     );
     if (!ok) return;
 
@@ -239,25 +294,39 @@ export default function AdminHome() {
     if (r.status === "Pending") {
       return (
         <div style={actionsWrap}>
-          <button style={btn} onClick={() => setApproveFor(r)}>Approve</button>
-          <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>Close</button>
+          <button style={btn} onClick={() => setApproveFor(r)}>
+            Approve
+          </button>
+          <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>
+            Close
+          </button>
         </div>
       );
     }
     if (r.status === "Approved") {
       return (
         <div style={actionsWrap}>
-          <button style={btn} onClick={() => markPaid(r)}>Mark Paid</button>
-          <button style={btn} onClick={() => startReschedule(r)}>Reschedule</button>
-          <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>Close</button>
+          <button style={btn} onClick={() => markPaid(r)}>
+            Mark Paid
+          </button>
+          <button style={btn} onClick={() => startReschedule(r)}>
+            Reschedule
+          </button>
+          <button style={btn} onClick={() => openCloseModal(r, "cancelled")}>
+            Close
+          </button>
         </div>
       );
     }
     if (r.status === "Paid") {
       return (
         <div style={actionsWrap}>
-          <button style={btn} onClick={() => openCloseModal(r, "completed")}>Finish (Close)</button>
-          <button style={btn} onClick={() => startReschedule(r)}>Reschedule</button>
+          <button style={btn} onClick={() => openCloseModal(r, "completed")}>
+            Finish (Close)
+          </button>
+          <button style={btn} onClick={() => startReschedule(r)}>
+            Reschedule
+          </button>
         </div>
       );
     }
@@ -266,8 +335,40 @@ export default function AdminHome() {
 
   return (
     <AdminLayout>
-      <Head><title>Admin • Bookings</title></Head>
-      <h1 style={{ fontSize: 28, margin: "8px 0 16px" }}>Bookings</h1>
+      <Head>
+        <title>Admin • Bookings</title>
+      </Head>
+
+      {/* Header + Sync button */}
+      <div
+        style={{
+          margin: "8px 0 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <h1 style={{ fontSize: 28, margin: 0 }}>Bookings</h1>
+        <button
+          type="button"
+          onClick={handleManualCalendarSync}
+          disabled={syncing}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 8,
+            border: "1px solid #1d4ed8",
+            background: syncing ? "#1d4ed8aa" : "#1d4ed8",
+            color: "#f9fafb",
+            cursor: syncing ? "default" : "pointer",
+            fontSize: 13,
+            fontWeight: 500,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {syncing ? "Syncing…" : "Sync Calendar Now"}
+        </button>
+      </div>
 
       {loading ? (
         <p>Loading…</p>
@@ -290,11 +391,7 @@ export default function AdminHome() {
             <tbody>
               {rows.map((r) => {
                 const cargoLabel =
-                  r.cargo_type === "vehicle"
-                    ? "Vehicle"
-                    : r.cargo_type === "load"
-                    ? "Load"
-                    : null;
+                  r.cargo_type === "vehicle" ? "Vehicle" : r.cargo_type === "load" ? "Load" : null;
 
                 return (
                   <tr key={r.id} style={{ borderTop: "1px solid #222" }}>
@@ -305,7 +402,7 @@ export default function AdminHome() {
                       </div>
                     </td>
                     <td style={td}>
-                      {(r.clients?.first_name || r.clients?.last_name)
+                      {r.clients?.first_name || r.clients?.last_name
                         ? `${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`.trim()
                         : "—"}
                       <div style={{ fontSize: 12, color: "#b8b8b8" }}>
@@ -313,7 +410,9 @@ export default function AdminHome() {
                       </div>
 
                       {/* NEW: Cargo & towing info */}
-                      {(cargoLabel || r.cargo_description || typeof r.towing_insured === "boolean") && (
+                      {(cargoLabel ||
+                        r.cargo_description ||
+                        typeof r.towing_insured === "boolean") && (
                         <div style={{ marginTop: 6, fontSize: 11, color: "#9ca3af" }}>
                           {cargoLabel && (
                             <div>
@@ -346,7 +445,9 @@ export default function AdminHome() {
                                     width: 6,
                                     height: 6,
                                     borderRadius: "50%",
-                                    backgroundColor: r.towing_insured ? "#22c55e" : "#ef4444",
+                                    backgroundColor: r.towing_insured
+                                      ? "#22c55e"
+                                      : "#ef4444",
                                   }}
                                 />
                                 {r.towing_insured ? "Confirmed" : "Not confirmed"}
@@ -357,7 +458,9 @@ export default function AdminHome() {
                       )}
                     </td>
                     <td style={td}>{r.trailers?.name ?? "—"}</td>
-                    <td style={td}>{r.start_date} → {r.end_date}</td>
+                    <td style={td}>
+                      {r.start_date} → {r.end_date}
+                    </td>
                     <td style={td}>{r.delivery_requested ? "Requested" : "No"}</td>
                     <td style={td}>
                       <div style={{ display: "grid", gap: 4 }}>
@@ -369,7 +472,9 @@ export default function AdminHome() {
                         )}
                       </div>
                     </td>
-                    <td style={td}><Actions r={r} /></td>
+                    <td style={td}>
+                      <Actions r={r} />
+                    </td>
                   </tr>
                 );
               })}
@@ -382,7 +487,8 @@ export default function AdminHome() {
         <div style={backdrop}>
           <div style={modal}>
             <h3 style={{ margin: "0 0 8px" }}>
-              Close booking <span style={{ color: "#93c5fd" }}>{closing.rental_id}</span>
+              Close booking{" "}
+              <span style={{ color: "#93c5fd" }}>{closing.rental_id}</span>
             </h3>
 
             <div style={{ display: "grid", gap: 10 }}>
@@ -415,7 +521,9 @@ export default function AdminHome() {
             </div>
 
             {policyNote && (
-              <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: 13 }}>{policyNote}</div>
+              <div style={{ marginTop: 10, color: "#cbd5e1", fontSize: 13 }}>
+                {policyNote}
+              </div>
             )}
 
             {outcome === "completed" && (
@@ -440,9 +548,20 @@ export default function AdminHome() {
               </label>
             )}
 
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-              <button style={btn} onClick={() => setClosing(null)}>Cancel</button>
-              <button style={btn} onClick={finalizeClose}>Close Booking</button>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                justifyContent: "flex-end",
+                marginTop: 16,
+              }}
+            >
+              <button style={btn} onClick={() => setClosing(null)}>
+                Cancel
+              </button>
+              <button style={btn} onClick={finalizeClose}>
+                Close Booking
+              </button>
             </div>
           </div>
         </div>
@@ -461,12 +580,60 @@ export default function AdminHome() {
   );
 }
 
-const th: React.CSSProperties = { padding: "10px 8px", fontSize: 12, color: "#b8b8b8", borderBottom: "1px solid #222" };
-const td: React.CSSProperties = { padding: "12px 8px", verticalAlign: "top" };
-const btn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #333", borderRadius: 8, background: "#141416", color: "#eaeaea", cursor: "pointer" };
-const actionsWrap: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap" };
-const backdrop: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 1000 };
-const modal: React.CSSProperties = { background: "#141416", border: "1px solid #222", borderRadius: 12, padding: 16, width: 560, maxWidth: "92vw" };
-const radioRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8 };
-const checkRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginTop: 12 };
-const ta: React.CSSProperties = { padding: 10, borderRadius: 8, background: "#0b1220", color: "#eaeaea", border: "1px solid #1f2937" };
+const th: React.CSSProperties = {
+  padding: "10px 8px",
+  fontSize: 12,
+  color: "#b8b8b8",
+  borderBottom: "1px solid #222",
+};
+const td: React.CSSProperties = {
+  padding: "12px 8px",
+  verticalAlign: "top",
+};
+const btn: React.CSSProperties = {
+  padding: "6px 10px",
+  border: "1px solid #333",
+  borderRadius: 8,
+  background: "#141416",
+  color: "#eaeaea",
+  cursor: "pointer",
+};
+const actionsWrap: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+const backdrop: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.5)",
+  display: "grid",
+  placeItems: "center",
+  zIndex: 1000,
+};
+const modal: React.CSSProperties = {
+  background: "#141416",
+  border: "1px solid #222",
+  borderRadius: 12,
+  padding: 16,
+  width: 560,
+  maxWidth: "92vw",
+};
+const radioRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+const checkRow: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  marginTop: 12,
+};
+const ta: React.CSSProperties = {
+  padding: 10,
+  borderRadius: 8,
+  background: "#0b1220",
+  color: "#eaeaea",
+  border: "1px solid #1f2937",
+};
