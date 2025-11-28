@@ -465,7 +465,8 @@ export default function AdminCalendarPage() {
                         overflow: "hidden",
                         whiteSpace: "nowrap",
                         textOverflow: "ellipsis",
-                        border: "1px solid rgba(15,23,42,0.35)`,
+                        // ✅ fixed line: now a normal string
+                        border: "1px solid rgba(15,23,42,0.35)",
                       }}
                     >
                       {seg.label}
