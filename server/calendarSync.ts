@@ -130,10 +130,14 @@ type CalendarBookingInput = {
   rentalId: string;
   trailerName: string | null;
   customerName: string;
-  startDate: string; // "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS" (ISO timestamp)
-  endDate: string;   // "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS" (ISO timestamp)
+  startDate: string; // "YYYY-MM-DD" or full ISO
+  endDate: string;   // "YYYY-MM-DD" or full ISO
   delivery?: boolean;
+
+  // NEW: used to keep Google event color in sync with trailer color
+  trailerColorHex?: string | null;
 };
+
 
 /**
  * Type guard to check if an error is a GaxiosError (Google API HTTP error)
