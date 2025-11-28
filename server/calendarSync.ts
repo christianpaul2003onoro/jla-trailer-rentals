@@ -72,6 +72,48 @@ function normalizePrivateKey(key: string): string {
 }
 
 /**
+ * Map our trailer color hex to a Google Calendar event colorId.
+ * Google only supports a fixed palette (1–11), so we approximate.
+ *
+ * Palette reference:
+ * 1 lavender, 2 sage, 3 grape, 4 flamingo, 5 banana,
+ * 6 tangerine, 7 peacock, 8 graphite, 9 blueberry, 10 basil, 11 tomato
+ */
+function hexToEventColorId(hex?: string | null): string | undefined {
+  if (!hex) return undefined;
+
+  const normalized = hex.trim().toLowerCase();
+
+  const mapping: Record<string, string> = {
+    // blue-ish
+    "#60a5fa": "9", // blueberry
+
+    // green-ish
+    "#34d399": "10", // basil
+
+    // red-ish
+    "#f87171": "11", // tomato
+
+    // orange
+    "#fb923c": "6", // tangerine
+
+    // purple
+    "#a78bfa": "3", // grape
+
+    // yellow
+    "#ffff00": "5", // banana
+
+    // pink
+    "#f472b6": "4", // flamingo
+  };
+
+  return mapping[normalized];
+}
+
+
+
+
+/**
  * Log startup diagnostics for the service account key (without exposing secrets).
  */
 function logKeyDiagnostics(key: string | undefined, source: string): void {
@@ -397,12 +439,17 @@ export async function createCalendarEvent(
   const startTime = buildEventStart(booking.startDate);
   const endTime = buildEventEnd(booking.startDate, booking.endDate);
 
-  const requestBody = {
+   const colorId = hexToEventColorId(booking.trailerColorHex);
+
+  const requestBody: calendar_v3.Schema$Event = {
     summary,
     description,
     start: startTime,
     end: endTime,
+    // Only set a colorId if we have a valid mapping
+    ...(colorId ? { colorId } : {}),
   };
+
 
   console.log("[CalendarSync] INSERT: Inserting event:", {
     calendarId: CALENDAR_ID,
@@ -455,12 +502,16 @@ export async function updateCalendarEvent(args: {
   const startTime = buildEventStart(booking.startDate);
   const endTime = buildEventEnd(booking.startDate, booking.endDate);
 
-  const requestBody = {
+    const colorId = hexToEventColorId(booking.trailerColorHex);
+
+  const requestBody: calendar_v3.Schema$Event = {
     summary,
     description,
     start: startTime,
     end: endTime,
+    ...(colorId ? { colorId } : {}),
   };
+
 
   console.log("[CalendarSync] PATCH: Patching event:", { 
     eventId, 
