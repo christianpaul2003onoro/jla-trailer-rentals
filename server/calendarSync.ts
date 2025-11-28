@@ -501,3 +501,53 @@ export async function deleteCalendarEvent(eventId: string): Promise<void> {
     throw e;
   }
 }
+
+// ---------------------------------------------------------------------------
+// LIST EVENTS (for Google → Supabase import)
+// ---------------------------------------------------------------------------
+
+export type RawCalendarEvent = calendar_v3.Schema$Event;
+
+export async function listCalendarEvents(params: {
+  timeMinISO: string; // e.g. new Date().toISOString()
+  timeMaxISO: string;
+  maxResults?: number;
+}): Promise<RawCalendarEvent[]> {
+  if (!CALENDAR_ID) {
+    throw new Error(
+      "[CalendarSync] ERROR: No CALENDAR_ID configured, cannot list events"
+    );
+  }
+
+  const calendar = getCalendarClient();
+
+  const { timeMinISO, timeMaxISO, maxResults } = params;
+
+  console.log("[CalendarSync] LIST: Fetching events from Google Calendar", {
+    calendarId: CALENDAR_ID,
+    timeMinISO,
+    timeMaxISO,
+    maxResults: maxResults ?? 250,
+  });
+
+  try {
+    const resp = await calendar.events.list({
+      calendarId: CALENDAR_ID,
+      timeMin: timeMinISO,
+      timeMax: timeMaxISO,
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: maxResults ?? 250,
+    });
+
+    const items = resp.data.items ?? [];
+    console.log("[CalendarSync] LIST: Retrieved events:", {
+      count: items.length,
+    });
+
+    return items;
+  } catch (e) {
+    logCalendarError("LIST ERROR", e);
+    throw e;
+  }
+}
