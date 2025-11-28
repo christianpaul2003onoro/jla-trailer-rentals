@@ -1,221 +1,256 @@
-// pages/admin/calendar/index.tsx
+// pages/admin/calendar.tsx
 import { useEffect, useMemo, useState } from "react";
-import type React from "react";
 import Head from "next/head";
 import AdminLayout from "../../components/AdminLayout";
 
-type AdminCalendarEvent = {
+type RawEvent = {
   id: string;
-  rental_id: string;
-  start_date: string; // "YYYY-MM-DD"
-  end_date: string;   // "YYYY-MM-DD" (inclusive)
-  status: "Pending" | "Approved" | "Paid" | "Closed" | "Blocked";
-  trailer_name: string | null;
-  trailer_color_hex: string | null;
+  rental_id?: string | null;
+  rentalId?: string | null;
+  start_date?: string;
+  end_date?: string;
+  startDate?: string;
+  endDate?: string;
+  trailer_name?: string | null;
+  trailerName?: string | null;
+  color_hex?: string | null;
+  trailer_color_hex?: string | null;
+  colorHex?: string | null;
+  status?: string | null;
 };
 
-type WeekDayCell = {
-  date: Date;
-  ymd: string;
-  inMonth: boolean;
-};
-
-// ----- tiny date helpers (work in local time, but all day-only) -----
-
-function parseYMD(ymd: string): Date {
-  const [y, m, d] = ymd.split("-").map((n) => parseInt(n, 10));
-  return new Date(y, m - 1, d);
-}
-
-function ymdFromDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function addDays(d: Date, n: number): Date {
-  const copy = new Date(d);
-  copy.setDate(copy.getDate() + n);
-  return copy;
-}
-
-function startOfMonth(d: Date): Date {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-function buildMonthMatrix(viewDate: Date): WeekDayCell[][] {
-  const firstOfMonth = startOfMonth(viewDate);
-  const monthIdx = firstOfMonth.getMonth();
-
-  // Start grid on the Sunday of the week that includes the 1st
-  const gridStart = new Date(firstOfMonth);
-  gridStart.setDate(firstOfMonth.getDate() - firstOfMonth.getDay()); // Sunday
-
-  const weeks: WeekDayCell[][] = [];
-  let cursor = gridStart;
-
-  for (let w = 0; w < 6; w++) {
-    const row: WeekDayCell[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(cursor);
-      row.push({
-        date: d,
-        ymd: ymdFromDate(d),
-        inMonth: d.getMonth() === monthIdx,
-      });
-      cursor = addDays(cursor, 1);
-    }
-    weeks.push(row);
-  }
-
-  // Optional: trim last empty week if entirely outside the month
-  if (weeks[5].every((c) => !c.inMonth)) {
-    weeks.pop();
-  }
-
-  return weeks;
-}
-
-// Represent an event segment that lives within a single week row
-type WeekSegment = {
+type CalendarEvent = {
   id: string;
-  rental_id: string;
-  title: string;
-  startCol: number; // 1-based CSS grid column start
-  span: number;     // column span
+  label: string;
+  start: Date;
+  end: Date;
   color: string;
 };
 
+type Week = Date[];
+
+// ---------- date helpers ----------
+function startOfDay(d: Date) {
+  const n = new Date(d);
+  n.setHours(0, 0, 0, 0);
+  return n;
+}
+
+function addDays(d: Date, n: number) {
+  const nd = new Date(d);
+  nd.setDate(nd.getDate() + n);
+  return nd;
+}
+
+function startOfMonth(d: Date) {
+  return startOfDay(new Date(d.getFullYear(), d.getMonth(), 1));
+}
+
+function endOfMonth(d: Date) {
+  return startOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+}
+
+function startOfWeekSunday(d: Date) {
+  const s = startOfDay(d);
+  const diff = s.getDay(); // 0 = Sun
+  return addDays(s, -diff);
+}
+
+function endOfWeekSunday(d: Date) {
+  const s = startOfWeekSunday(d);
+  return addDays(s, 6);
+}
+
+function formatMonthHeader(d: Date) {
+  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// ---------- normalize events coming from API ----------
+function normalizeEvents(raw: RawEvent[]): CalendarEvent[] {
+  return raw
+    .map((e) => {
+      const startISO = e.startDate ?? e.start_date;
+      const endISO = e.endDate ?? e.end_date ?? startISO;
+      if (!startISO || !endISO) return null;
+
+      const start = startOfDay(new Date(startISO));
+      const end = startOfDay(new Date(endISO));
+
+      const rentalId = e.rentalId ?? e.rental_id ?? "";
+      const trailerName = e.trailerName ?? e.trailer_name ?? "";
+      const baseLabel = rentalId || trailerName || "Booking";
+
+      const label =
+        rentalId && trailerName
+          ? `${rentalId} • ${trailerName}`
+          : baseLabel;
+
+      const color =
+        e.colorHex ??
+        e.trailer_color_hex ??
+        e.color_hex ??
+        "#6b7280"; // default gray
+
+      return {
+        id: e.id,
+        label,
+        start,
+        end,
+        color,
+      } as CalendarEvent;
+    })
+    .filter((x): x is CalendarEvent => !!x);
+}
+
+// Build weeks between calendarStart and calendarEnd
+function buildWeeks(calendarStart: Date, calendarEnd: Date): Week[] {
+  const weeks: Week[] = [];
+  let cursor = startOfWeekSunday(calendarStart);
+  while (cursor <= calendarEnd) {
+    const week: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      week.push(addDays(cursor, i));
+    }
+    weeks.push(week);
+    cursor = addDays(cursor, 7);
+  }
+  return weeks;
+}
+
+// ---------- React page ----------
 export default function AdminCalendarPage() {
-  const [events, setEvents] = useState<AdminCalendarEvent[]>([]);
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
-  // Month we’re looking at (anchor date = first day of month)
-  const [viewDate, setViewDate] = useState<Date>(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
-  });
+  const today = useMemo(() => startOfDay(new Date()), []);
 
-  async function loadEvents() {
-    setLoading(true);
-    setError(null);
-    try {
-      const resp = await fetch("/api/admin/calendar/events", {
-        credentials: "include",
-      });
+  const activeMonth = useMemo(() => {
+    const base = new Date();
+    return new Date(base.getFullYear(), base.getMonth() + monthOffset, 1);
+  }, [monthOffset]);
 
-      if (resp.status === 401) {
-        window.location.href = "/admin/login";
-        return;
-      }
+  const monthStart = useMemo(() => startOfMonth(activeMonth), [activeMonth]);
+  const monthEnd = useMemo(() => endOfMonth(activeMonth), [activeMonth]);
+  const calendarStart = useMemo(
+    () => startOfWeekSunday(monthStart),
+    [monthStart]
+  );
+  const calendarEnd = useMemo(
+    () => endOfWeekSunday(monthEnd),
+    [monthEnd]
+  );
 
-      const json = await resp.json();
-      if (!resp.ok || json?.ok === false) {
-        setError(json?.error || "Failed to load calendar events.");
-        setEvents([]);
-      } else {
-        setEvents(json?.events ?? []);
-      }
-    } catch (e: any) {
-      setError(e?.message || "Network error while loading events.");
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const weeks = useMemo(
+    () => buildWeeks(calendarStart, calendarEnd),
+    [calendarStart, calendarEnd]
+  );
 
+  // Fetch events once on mount (backend already limits range)
   useEffect(() => {
-    loadEvents();
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const resp = await fetch("/api/admin/calendar/events", {
+          credentials: "include",
+        });
+
+        if (resp.status === 401) {
+          window.location.href = "/admin/login";
+          return;
+        }
+
+        const text = await resp.text();
+        let data: any;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error("Unexpected response from server.");
+        }
+
+        if (!resp.ok || data?.ok === false) {
+          throw new Error(data?.error || "Failed to load calendar events.");
+        }
+
+        const rawEvents: RawEvent[] = data.events ?? data.rows ?? [];
+        const normalized = normalizeEvents(rawEvents);
+
+        if (!cancelled) {
+          setEvents(normalized);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message || "Network error while loading events.");
+          setEvents([]);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // “Sync now” – pulls from Google and then reloads
-  async function syncNow() {
+  // Manual “Sync now” – hits the import endpoint, then refreshes events
+  async function handleSyncNow() {
+    setSyncing(true);
     try {
-      const resp = await fetch("/api/admin/calendar/import-from-google", {
+      await fetch("/api/admin/calendar/import-from-google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ daysBack: 7, daysForward: 90 }),
+        body: JSON.stringify({ daysBack: 2, daysForward: 90 }),
+      }).catch(() => undefined);
+
+      // After import, refetch events
+      const resp = await fetch("/api/admin/calendar/events", {
+        credentials: "include",
       });
-      const json = await resp.json().catch(() => ({}));
-      if (!resp.ok || json?.ok === false) {
-        alert(json?.error || "Sync failed.");
-      } else {
-        await loadEvents();
+      const json = await resp.json().catch(() => ({} as any));
+      if (resp.ok && json?.events) {
+        setEvents(normalizeEvents(json.events));
       }
-    } catch (e: any) {
-      alert(e?.message || "Sync failed.");
+    } finally {
+      setSyncing(false);
     }
   }
 
-  const weeks = useMemo(() => buildMonthMatrix(viewDate), [viewDate]);
+  // For each week, build segments that stay inside that week and span columns
+  function getWeekSegments(week: Week) {
+    const weekStart = week[0];
+    const weekEnd = week[6];
 
-  // Pre-compute numeric day indices to build segments cleanly
-  const segmentsByWeek: WeekSegment[][] = useMemo(() => {
-    if (!weeks.length) return [];
+    return events
+      .filter((ev) => ev.end >= weekStart && ev.start <= weekEnd)
+      .map((ev) => {
+        const segStart = ev.start < weekStart ? weekStart : ev.start;
+        const segEnd = ev.end > weekEnd ? weekEnd : ev.end;
 
-    // Helper to convert "YYYY-MM-DD" → day index number
-    const dayIndex = (ymd: string): number => {
-      const d = parseYMD(ymd);
-      return Math.floor(d.getTime() / 86400000);
-    };
+        const startCol = segStart.getDay() + 1; // 1–7
+        const endCol = segEnd.getDay() + 1;
 
-    return weeks.map((week) => {
-      const weekStartIdx = dayIndex(week[0].ymd);
-      const weekEndIdx = dayIndex(week[6].ymd);
-
-      const segments: WeekSegment[] = [];
-
-      for (const ev of events) {
-        const evStartIdx = dayIndex(ev.start_date);
-        const evEndIdx = dayIndex(ev.end_date); // inclusive
-
-        // If event does not overlap this week, skip
-        if (evEndIdx < weekStartIdx || evStartIdx > weekEndIdx) continue;
-
-        const segStartIdx = Math.max(evStartIdx, weekStartIdx);
-        const segEndIdx = Math.min(evEndIdx, weekEndIdx);
-
-        const startCol = segStartIdx - weekStartIdx + 1; // 1-based
-        const span = segEndIdx - segStartIdx + 1;
-
-        const labelTrailer = ev.trailer_name ? ` · ${ev.trailer_name}` : "";
-        const title = `${ev.rental_id}${labelTrailer}`;
-
-        segments.push({
-          id: `${ev.id}-${weekStartIdx}`, // unique per week
-          rental_id: ev.rental_id,
-          title,
+        return {
+          id: ev.id + "_" + startCol + "_" + endCol,
+          label: ev.label,
+          color: ev.color,
           startCol,
-          span,
-          color: ev.trailer_color_hex || "#4b5563",
-        });
-      }
-
-      return segments;
-    });
-  }, [weeks, events]);
-
-  const monthLabel = useMemo(() => {
-    return viewDate.toLocaleString(undefined, {
-      month: "long",
-      year: "numeric",
-    });
-  }, [viewDate]);
-
-  function goPrevMonth() {
-    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  }
-
-  function goNextMonth() {
-    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-  }
-
-  function goToday() {
-    const now = new Date();
-    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
+          endCol,
+        };
+      });
   }
 
   return (
@@ -224,190 +259,226 @@ export default function AdminCalendarPage() {
         <title>Admin • Calendar</title>
       </Head>
 
-      <h1 style={{ fontSize: 28, margin: "8px 0 16px" }}>Calendar</h1>
+      <h1 style={{ fontSize: 28, margin: "8px 0 4px" }}>Calendar</h1>
+      <div style={{ color: "#9ca3af", marginBottom: 16 }}>
+        {formatMonthHeader(activeMonth)}
+      </div>
 
-      {/* Top controls */}
-      <div style={controlsRow}>
-        <div style={{ fontWeight: 600, fontSize: 18 }}>{monthLabel}</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button style={btn} onClick={goPrevMonth}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 12,
+          gap: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            style={navButton}
+            onClick={() => setMonthOffset((m) => m - 1)}
+          >
             ◀ Previous month
           </button>
-          <button style={btn} onClick={goToday}>
+          <button style={navButton} onClick={() => setMonthOffset(0)}>
             Today
           </button>
-          <button style={btn} onClick={goNextMonth}>
+          <button
+            style={navButton}
+            onClick={() => setMonthOffset((m) => m + 1)}
+          >
             Next month ▶
           </button>
-          <button style={primaryBtn} onClick={syncNow}>
-            🔄 Sync now
-          </button>
         </div>
+
+        <button
+          style={{
+            ...navButton,
+            background: "#16a34a",
+            borderColor: "#15803d",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+          onClick={handleSyncNow}
+          disabled={syncing}
+        >
+          {syncing ? "Syncing…" : "🔄 Sync now"}
+        </button>
       </div>
 
       {error && (
-        <div style={errorBox}>
+        <div
+          style={{
+            marginBottom: 12,
+            padding: "8px 10px",
+            borderRadius: 8,
+            background: "#451a1a",
+            color: "#fecaca",
+            border: "1px solid #b91c1c",
+            fontSize: 13,
+          }}
+        >
           {error}
         </div>
       )}
 
-      {loading ? (
-        <p>Loading…</p>
-      ) : (
-        <div style={monthGridOuter}>
-          {/* Day-of-week header */}
-          <div style={dowHeader}>
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} style={dowCell}>
-                {d}
-              </div>
-            ))}
-          </div>
+      <div
+        style={{
+          borderRadius: 12,
+          border: "1px solid #1f2933",
+          overflow: "hidden",
+          background: "#020617",
+        }}
+      >
+        {/* day-of-week header */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            background: "#020617",
+            borderBottom: "1px solid #111827",
+          }}
+        >
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+            <div
+              key={d}
+              style={{
+                padding: "8px 10px",
+                fontSize: 12,
+                color: "#9ca3af",
+                textAlign: "left",
+              }}
+            >
+              {d}
+            </div>
+          ))}
+        </div>
 
-          {/* Weeks */}
-          <div style={weeksContainer}>
-            {weeks.map((week, weekIdx) => (
-              <div key={weekIdx} style={weekRow}>
-                {/* Day cells row */}
-                <div style={weekDayCellsRow}>
-                  {week.map((cell) => (
-                    <div
-                      key={cell.ymd}
-                      style={{
-                        ...dayCell,
-                        opacity: cell.inMonth ? 1 : 0.35,
-                      }}
-                    >
-                      <div style={dayNumber}>{cell.date.getDate()}</div>
-                    </div>
-                  ))}
+        {/* weeks */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 0,
+          }}
+        >
+          {weeks.map((week, wi) => {
+            const segments = getWeekSegments(week);
+
+            return (
+              <div
+                key={wi}
+                style={{
+                  borderTop: wi === 0 ? "none" : "1px solid #111827",
+                  padding: "2px 0 10px",
+                }}
+              >
+                {/* day cells */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                    minHeight: 70,
+                  }}
+                >
+                  {week.map((day, di) => {
+                    const inMonth =
+                      day.getMonth() === activeMonth.getMonth();
+                    const isToday = isSameDay(day, today);
+
+                    return (
+                      <div
+                        key={di}
+                        style={{
+                          borderRight:
+                            di === 6 ? "none" : "1px solid #111827",
+                          padding: "4px 6px",
+                          position: "relative",
+                          background: "#020617",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: inMonth ? "#e5e7eb" : "#4b5563",
+                            textAlign: "right",
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              minWidth: 18,
+                              height: 18,
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: 999,
+                              background: isToday ? "#2563eb" : "transparent",
+                              color: isToday ? "white" : undefined,
+                            }}
+                          >
+                            {day.getDate()}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Events row – 7-column grid, segments span multiple days */}
-                <div style={weekEventsRow}>
-                  {segmentsByWeek[weekIdx]?.map((seg) => (
+                {/* event bars for this week */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                    gridAutoRows: "1.3rem",
+                    gap: 2,
+                    padding: "2px 4px 0",
+                  }}
+                >
+                  {segments.map((seg) => (
                     <div
                       key={seg.id}
                       style={{
-                        ...eventBar,
-                        gridColumn: `${seg.startCol} / span ${seg.span}`,
+                        gridColumn: `${seg.startCol} / ${seg.endCol + 1}`,
                         background: seg.color,
+                        borderRadius: 999,
+                        padding: "0 6px",
+                        fontSize: 11,
+                        color: "#020617",
+                        display: "flex",
+                        alignItems: "center",
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
+                        textOverflow: "ellipsis",
+                        border: "1px solid rgba(15,23,42,0.35)",
                       }}
-                      title={seg.title}
                     >
-                      {seg.title}
+                      {seg.label}
                     </div>
                   ))}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
+
+          {loading && (
+            <div style={{ padding: 10, fontSize: 13, color: "#9ca3af" }}>
+              Loading…
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </AdminLayout>
   );
 }
 
-/* ------- styles ------- */
-
-const controlsRow: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 12,
-};
-
-const btn: React.CSSProperties = {
+const navButton: React.CSSProperties = {
   padding: "6px 10px",
-  borderRadius: 8,
-  border: "1px solid #374151",
-  background: "#111827",
-  color: "#e5e7eb",
-  cursor: "pointer",
-  fontSize: 13,
-};
-
-const primaryBtn: React.CSSProperties = {
-  ...btn,
-  background: "#059669",
-  borderColor: "#047857",
-};
-
-const errorBox: React.CSSProperties = {
-  background: "#451a1a",
-  border: "1px solid #fecaca",
-  color: "#fecaca",
-  padding: "8px 10px",
-  borderRadius: 8,
-  marginBottom: 12,
-  fontSize: 13,
-};
-
-const monthGridOuter: React.CSSProperties = {
-  background: "#020617",
-  borderRadius: 12,
-  border: "1px solid #111827",
-  padding: 8,
-};
-
-const dowHeader: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(7, 1fr)",
-  fontSize: 12,
-  color: "#9ca3af",
-  marginBottom: 4,
-};
-
-const dowCell: React.CSSProperties = {
-  padding: "4px 6px",
-  textAlign: "left",
-};
-
-const weeksContainer: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-};
-
-const weekRow: React.CSSProperties = {
-  borderTop: "1px solid #111827",
-  paddingTop: 2,
-  paddingBottom: 6,
-};
-
-const weekDayCellsRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(7, 1fr)",
-  gap: 1,
-};
-
-const dayCell: React.CSSProperties = {
-  minHeight: 46,
-  borderRadius: 6,
-  border: "1px solid #111827",
-  background: "#020617",
-  padding: "2px 4px",
-};
-
-const dayNumber: React.CSSProperties = {
-  fontSize: 11,
-  color: "#e5e7eb",
-};
-
-const weekEventsRow: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(7, 1fr)",
-  gap: 3,
-  marginTop: 4,
-};
-
-const eventBar: React.CSSProperties = {
-  fontSize: 11,
-  color: "#0b1120",
   borderRadius: 999,
-  padding: "2px 6px",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
+  border: "1px solid #374151",
+  background: "#020617",
+  color: "#e5e7eb",
+  fontSize: 13,
+  cursor: "pointer",
 };
-
