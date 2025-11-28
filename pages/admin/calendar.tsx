@@ -13,9 +13,13 @@ type RawEvent = {
   endDate?: string;
   trailer_name?: string | null;
   trailerName?: string | null;
+
+  // color-ish fields that might come from the API
   color_hex?: string | null;
   trailer_color_hex?: string | null;
   colorHex?: string | null;
+  trailerColorHex?: string | null;
+
   status?: string | null;
 };
 
@@ -98,8 +102,10 @@ function normalizeEvents(raw: RawEvent[]): CalendarEvent[] {
           ? `${rentalId} • ${trailerName}`
           : baseLabel;
 
-      // 🔴 KEY PART: check nested trailers.color_hex as well
+      // KEY: now we also look at trailerColorHex (from the API),
+      // plus the other possible names and the nested trailers.color_hex.
       const color =
+        e.trailerColorHex ??
         e.colorHex ??
         e.trailer_color_hex ??
         e.color_hex ??
@@ -117,7 +123,6 @@ function normalizeEvents(raw: RawEvent[]): CalendarEvent[] {
     })
     .filter((x): x is CalendarEvent => !!x);
 }
-
 
 // Build weeks between calendarStart and calendarEnd
 function buildWeeks(calendarStart: Date, calendarEnd: Date): Week[] {
@@ -460,7 +465,7 @@ export default function AdminCalendarPage() {
                         overflow: "hidden",
                         whiteSpace: "nowrap",
                         textOverflow: "ellipsis",
-                        border: "1px solid rgba(15,23,42,0.35)",
+                        border: "1px solid rgba(15,23,42,0.35)`,
                       }}
                     >
                       {seg.label}
