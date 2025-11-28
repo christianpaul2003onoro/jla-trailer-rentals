@@ -1,13 +1,12 @@
 // app/api/admin/calendar/sync/route.ts
-// Scheduled job: call the import-from-google endpoint once per day
+// Scheduled job: call the import-from-google endpoint every 30 minutes
 
 import { NextResponse } from "next/server";
 
 export const config = {
   runtime: "edge",
-  // CRON in UTC. This example = every day at 06:00 UTC.
-  // Change it if you want another time.
-  scheduled: "0 6 * * *",
+  // every 30 minutes (UTC)
+  scheduled: "*/30 * * * *",
 };
 
 export async function GET() {
@@ -18,13 +17,15 @@ export async function GET() {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Same window you were using in the console
-      body: JSON.stringify({ daysBack: 2, daysForward: 60, source: "cron" }),
+      body: JSON.stringify({
+        daysBack: 2,
+        daysForward: 60,
+        source: "cron-30min",
+      }),
     });
 
     const json = await res.json().catch(() => ({}));
 
-    // Log a bit for Vercel
     console.log("[CronSync] Finished import-from-google", {
       status: res.status,
       created: json?.created,
