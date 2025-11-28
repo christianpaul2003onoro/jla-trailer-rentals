@@ -35,8 +35,8 @@ export default function AdminCalendarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [startOffset, setStartOffset] = useState(0);   // days from today
-  const [totalDays] = useState(28);                    // 4-week window
+  const [startOffset, setStartOffset] = useState(0); // days from today
+  const totalDays = 35; // 5 weeks
 
   const startDate = addDays(new Date(), startOffset);
   const endDate = addDays(startDate, totalDays - 1);
@@ -79,13 +79,12 @@ export default function AdminCalendarPage() {
     }
   }
 
-  // initial load + reload if window range changes
   useEffect(() => {
     loadEvents();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startOffset]);
 
-  // manual “Sync now” → call import-from-google endpoint then reload
+  // Manual “Sync now” → imports from Google then reloads
   async function handleSyncNow() {
     if (!window.confirm("Sync with Google Calendar now?")) return;
 
@@ -133,7 +132,14 @@ export default function AdminCalendarPage() {
         <title>Admin • Calendar</title>
       </Head>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
         <h1 style={{ fontSize: 24, margin: 0 }}>Calendar</h1>
 
         <div style={{ display: "flex", gap: 8 }}>
@@ -143,10 +149,7 @@ export default function AdminCalendarPage() {
           >
             ◀ Previous week
           </button>
-          <button
-            style={navBtn}
-            onClick={() => setStartOffset(0)}
-          >
+          <button style={navBtn} onClick={() => setStartOffset(0)}>
             Today
           </button>
           <button
@@ -186,14 +189,14 @@ export default function AdminCalendarPage() {
         </div>
       )}
 
+      {/* 7 columns → 5 rows (35 days) like a month grid */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${totalDays}, minmax(90px, 1fr))`,
+          gridTemplateColumns: "repeat(7, minmax(120px, 1fr))",
           gap: 4,
           borderTop: "1px solid #1f2937",
           borderLeft: "1px solid #1f2937",
-          overflowX: "auto",
         }}
       >
         {days.map((d) => {
@@ -203,7 +206,7 @@ export default function AdminCalendarPage() {
             <div
               key={key}
               style={{
-                minHeight: 120,
+                minHeight: 100,
                 borderRight: "1px solid #1f2937",
                 borderBottom: "1px solid #1f2937",
                 padding: 4,
