@@ -1,52 +1,46 @@
-// app/api/admin/calendar/sync/route.ts
-// Scheduled job: call the import-from-google endpoint every 30 minutes
-
-import { NextResponse } from "next/server";
+// pages/api/admin/calendar/sync/route.ts
+// Edge Scheduled Function – runs every 30 minutes and calls the import-from-google API
 
 export const config = {
   runtime: "edge",
-  // every 30 minutes (UTC)
+  // every 30 minutes
   scheduled: "*/30 * * * *",
 };
 
-export async function GET() {
-  const base = (process.env.SITE_URL || "https://www.jlatrailers.com").replace(/\/$/, "");
-  const url = `${base}/api/admin/calendar/import-from-google`;
-
+async function handler() {
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        daysBack: 2,
-        daysForward: 60,
-        source: "cron-30min",
-      }),
-    });
+    // Base URL for your site (production + preview)
+    const baseUrl =
+      process.env.SITE_URL || // if you set SITE_URL = https://www.jlatrailers.com
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000");
 
-    const json = await res.json().catch(() => ({}));
-
-    console.log("[CronSync] Finished import-from-google", {
-      status: res.status,
-      created: json?.created,
-      skippedExisting: json?.skippedExisting,
-      ignored: json?.ignored,
-    });
-
-    return NextResponse.json(
+    const res = await fetch(
+      `${baseUrl}/api/admin/calendar/import-from-google`,
       {
-        ok: true,
-        cron: true,
-        status: res.status,
-        result: json,
-      },
-      { status: 200 }
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // same window you’ve been testing with manually
+        body: JSON.stringify({ daysBack: 2, daysForward: 60 }),
+      }
     );
-  } catch (err: any) {
-    console.error("[CronSync] ERROR calling import-from-google:", err);
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Cron sync failed" },
-      { status: 500 }
-    );
+
+    const json = await res.json().catch(() => null);
+
+    console.log("[Cron] calendar sync run:", {
+      status: res.status,
+      ok: res.ok,
+      json,
+    });
+  } catch (e) {
+    console.error("[Cron] calendar sync FAILED:", e);
   }
+
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 }
+
+export default handler;
