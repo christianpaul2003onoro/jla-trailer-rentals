@@ -15,7 +15,13 @@ type AdminCalendarEvent = {
   end_date: string;   // YYYY-MM-DD
   customerName: string;
   trailerName: string | null;
+
+  // original field you had
   trailerColorHex: string | null;
+
+  // NEW: flat color field so the calendar can pick it up easily
+  color_hex: string | null;
+
   delivery_requested: boolean;
 };
 
@@ -80,6 +86,8 @@ export default async function handler(
         [client?.first_name, client?.last_name].filter(Boolean).join(" ") ||
         "Client";
 
+      const trailerColorHex = trailer?.color_hex ?? null;
+
       return {
         id: row.id,
         rental_id: row.rental_id,
@@ -88,7 +96,13 @@ export default async function handler(
         end_date: row.end_date,
         customerName,
         trailerName: trailer?.name ?? null,
-        trailerColorHex: trailer?.color_hex ?? null,
+
+        // keep your original
+        trailerColorHex,
+
+        // NEW flat name that matches what the calendar already expects
+        color_hex: trailerColorHex,
+
         delivery_requested: !!row.delivery_requested,
       };
     });
