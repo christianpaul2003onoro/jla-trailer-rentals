@@ -101,7 +101,8 @@ export default async function handler(
       approved_at,
       calendar_event_id,
       clients:clients ( email, first_name, last_name ),
-      trailers:trailers ( name )
+      trailers:trailers ( name, color_hex )
+
     `
     )
     .eq("id", bookingId)
@@ -112,7 +113,8 @@ export default async function handler(
   const clientRec = first<{ email?: string; first_name?: string; last_name?: string }>(
     booking.clients as any
   );
-  const trailerRec = first<{ name?: string }>(booking.trailers as any);
+    const trailerRec = first<{ name?: string; color_hex?: string }>(booking.trailers as any);
+
 
   const customerEmail = clientRec?.email;
   if (!customerEmail) return bad(res, 400, "Booking has no customer email");
@@ -136,14 +138,16 @@ export default async function handler(
   let calendarEventId: string | null = null;
   let calendarError: string | null = null;
   try {
-    calendarEventId = await createCalendarEvent({
+       calendarEventId = await createCalendarEvent({
       rentalId: booking.rental_id as string,
       trailerName: trailerRec?.name ?? null,
       customerName,
-      startDate: startForCalendar,
-      endDate: endForCalendar,
+      startDate: booking.start_date as string,
+      endDate: booking.end_date as string,
       delivery: !!booking.delivery_requested,
+      trailerColorHex: trailerRec?.color_hex ?? null,
     });
+
   } catch (e: unknown) {
     const errorMessage = e instanceof Error ? e.message : String(e);
     console.error("[Approve] CALENDAR_CREATE_ON_APPROVE_ERROR:", errorMessage);
