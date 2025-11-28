@@ -76,7 +76,7 @@ function isSameDay(a: Date, b: Date) {
 // ---------- normalize events coming from API ----------
 function normalizeEvents(raw: RawEvent[]): CalendarEvent[] {
   return raw
-    .map((e) => {
+    .map((e: any) => {
       const startISO = e.startDate ?? e.start_date;
       const endISO = e.endDate ?? e.end_date ?? startISO;
       if (!startISO || !endISO) return null;
@@ -85,19 +85,27 @@ function normalizeEvents(raw: RawEvent[]): CalendarEvent[] {
       const end = startOfDay(new Date(endISO));
 
       const rentalId = e.rentalId ?? e.rental_id ?? "";
-      const trailerName = e.trailerName ?? e.trailer_name ?? "";
-      const baseLabel = rentalId || trailerName || "Booking";
+      const trailerName =
+        e.trailerName ??
+        e.trailer_name ??
+        e.trailer ??
+        e.trailers?.name ??
+        "";
 
+      const baseLabel = rentalId || trailerName || "Booking";
       const label =
         rentalId && trailerName
           ? `${rentalId} • ${trailerName}`
           : baseLabel;
 
+      // 🔴 KEY PART: check nested trailers.color_hex as well
       const color =
         e.colorHex ??
         e.trailer_color_hex ??
         e.color_hex ??
-        "#6b7280"; // default gray
+        e.trailers?.color_hex ??
+        e.trailers?.colorHex ??
+        "#6b7280"; // fallback gray
 
       return {
         id: e.id,
@@ -109,6 +117,7 @@ function normalizeEvents(raw: RawEvent[]): CalendarEvent[] {
     })
     .filter((x): x is CalendarEvent => !!x);
 }
+
 
 // Build weeks between calendarStart and calendarEnd
 function buildWeeks(calendarStart: Date, calendarEnd: Date): Week[] {
