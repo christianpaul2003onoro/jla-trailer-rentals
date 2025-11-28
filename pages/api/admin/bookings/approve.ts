@@ -44,6 +44,22 @@ function isHttpUrl(s?: string): s is string {
   }
 }
 
+/**
+ * Combine a YYYY-MM-DD date with an HH:mm pickup time.
+ * If time is missing or malformed, returns the original date (date-only).
+ */
+function combineDateAndTime(date: string, time?: string | null): string {
+  if (!time) return date; // falls back to default hours in calendarSync
+
+  const trimmed = time.trim();
+  // Accept "HH:mm" (e.g. "09:00", "17:30")
+  if (!/^\d{2}:\d{2}$/.test(trimmed)) {
+    return date;
+  }
+
+  return `${date}T${trimmed}:00`;
+}
+
 /* ---------- HANDLER ---------- */
 export default async function handler(
   req: NextApiRequest,
@@ -68,7 +84,7 @@ export default async function handler(
   if (!isHttpUrl(paymentLink))
     return bad(res, 400, "Invalid paymentLink (must be http/https)");
 
-  // 1) Fetch booking + client + trailer
+  // 1) Fetch booking + client + trailer (INCLUDE pickup_time)
   const { data: booking, error: fetchErr } = await supabase
     .from("bookings")
     .select(
@@ -78,6 +94,7 @@ export default async function handler(
       status,
       start_date,
       end_date,
+      pickup_time,
       delivery_requested,
       payment_link,
       payment_link_sent_at,
@@ -104,6 +121,17 @@ export default async function handler(
     [clientRec?.first_name, clientRec?.last_name].filter(Boolean).join(" ") ||
     "Client";
 
+  // Build start/end with pickup time for calendar (24h cycle)
+  const pickupTime = booking.pickup_time as string | null;
+  const startForCalendar = combineDateAndTime(
+    booking.start_date as string,
+    pickupTime
+  );
+  const endForCalendar = combineDateAndTime(
+    booking.end_date as string,
+    pickupTime
+  );
+
   // 2) Google Calendar: create event (best effort, but surface errors)
   let calendarEventId: string | null = null;
   let calendarError: string | null = null;
@@ -112,8 +140,8 @@ export default async function handler(
       rentalId: booking.rental_id as string,
       trailerName: trailerRec?.name ?? null,
       customerName,
-      startDate: booking.start_date as string,
-      endDate: booking.end_date as string,
+      startDate: startForCalendar,
+      endDate: endForCalendar,
       delivery: !!booking.delivery_requested,
     });
   } catch (e: unknown) {
@@ -183,7 +211,8 @@ export default async function handler(
       html,
     });
   } catch (e: unknown) {
-    const emailErrorMessage = e instanceof Error ? e.message : "Failed to send email";
+    const emailErrorMessage =
+      e instanceof Error ? e.message : "Failed to send email";
     // Still return success with emailSent=false so UI can show a toast
     return ok(res, {
       row: updated,
@@ -194,8 +223,8 @@ export default async function handler(
     });
   }
 
-  return ok(res, { 
-    row: updated, 
+  return ok(res, {
+    row: updated,
     emailSent: true,
     calendarEventId,
     calendarError,
